@@ -1,0 +1,94 @@
+{
+    "member_url_regex": "http://location.example.com/tracks/observation/(\\d{4}-\\d{2}-\\d{2}T\\d{2}%3A\\d{2}%3A\\d{2}Z$)",
+    "schema": [
+        {
+            "subject": "MemberSubject",
+            "predicate": "http://www.w3.org/ns/sosa/hasFeatureOfInterest",
+            "object": null
+        },
+        {
+            "subject": "MemberSubject",
+            "predicate": "http://www.w3.org/ns/sosa/resultTime",
+            "object": null
+        },
+        {
+            "subject": "MemberSubject",
+            "predicate": "http://www.w3.org/ns/sosa/Observation",
+            "object": null
+        },
+        {
+            "subject": "MemberSubject",
+            "predicate": "http://www.w3.org/ns/sosa/hasResult",
+            "object": {
+                "LinkedSubject": {
+                    "subject": "hasResult"
+                }
+            }
+        },
+        {
+            "subject": "MemberSubject",
+            "predicate": "http://www.w3.org/ns/sosa/observedProperty",
+            "object": null
+        },
+        {
+            "subject": "MemberSubject",
+            "predicate": "http://www.w3.org/ns/sosa/hasSimpleResult",
+            "object": null
+        },
+        {
+            "subject": "MemberSubject",
+            "predicate": "http://purl.org/dc/terms/isVersionOf",
+            "object": null
+        },
+        {
+            "subject": "MemberSubject",
+            "predicate": "http://www.w3.org/ns/sosa/madeBySensor",
+            "object": null
+        },
+        {
+            "subject": {
+                "LinkedSubject": {
+                    "subject": "hasResult"
+                }
+            },
+            "predicate":"http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+            "object":null
+        },
+        {
+            "subject": {
+                "LinkedSubject": {
+                    "subject": "hasResult"
+                }
+            },
+            "predicate":"http://www.w3.org/2003/01/geo/wgs84_pos#latitude",
+            "object":null
+        },
+        {
+            "subject": {
+                "LinkedSubject": {
+                    "subject": "hasResult"
+                }
+            },
+            "predicate":"http://www.w3.org/2003/01/geo/wgs84_pos#longitude",
+            "object":null
+        },
+        {
+            "subject": {
+                "LinkedSubject": {
+                    "subject": "hasResult"
+                }
+            },
+            "predicate":"http://www.w3.org/2003/01/geo/wgs84_pos#elevation",
+            "object":null
+        },
+        {
+            "subject": {
+                "LinkedSubject": {
+                    "subject": "hasResult"
+                }
+            },
+            "predicate":"https://w3id.org/transportmode#transportMode",
+            "object":null
+        }
+    ]
+}
