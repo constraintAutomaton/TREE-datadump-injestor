@@ -69,7 +69,6 @@ pub fn read_datadump(
                     subject: t.subject.to_string(),
                     predicate: t.predicate.to_string(),
                     object: t.object.to_string(),
-                    member_url_regex: data_injection_config.member_url_regex.clone(),
                     related_subject: HashSet::new(),
                 };
                 if schema.is_valid(&input, &re_member_id) {

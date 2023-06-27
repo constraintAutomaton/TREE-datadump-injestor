@@ -57,6 +57,5 @@ pub struct SchemaValidatorInput {
     pub subject: String,
     pub predicate: String,
     pub object: String,
-    pub member_url_regex: String,
     pub related_subject: HashSet<String>,
 }
