@@ -1,5 +1,5 @@
 use super::config::*;
-use super::domain::*;
+use super::member::*;
 use rio_api::parser::TriplesParser;
 use rio_turtle;
 use std::collections::HashSet;
@@ -17,7 +17,7 @@ pub fn read_datadump(
     large_file: bool,
 ) -> Result<(), Box<dyn Error>> {
     let file = File::open(path_data_dump.clone())?;
-    let mut current_member = Members::default();
+    let mut current_member = Member::default();
     let n_properties = data_injection_config.schema.len();
     let create_empy_valid_property = || -> Vec<bool> {
         let mut resp = Vec::with_capacity(n_properties);
@@ -80,7 +80,7 @@ pub fn read_datadump(
         // the current member is materialized if it is complete
         if valid_properties == full_property_valid {
             //println!("{:?}", current_member);
-            current_member = Members::new(n_properties);
+            current_member = Member::new(n_properties);
             valid_properties = create_empy_valid_property();
             n_members_sorted += 1;
             if n_members_sorted % notice_frequency == 0 {
