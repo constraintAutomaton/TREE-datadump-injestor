@@ -26,10 +26,9 @@ pub struct Schema {
     pub object: Option<SubjectDescriptor>,
 }
 impl Schema {
-    pub fn is_valid(&self, input: &SchemaValidatorInput) -> bool {
+    pub fn is_valid(&self, input: &SchemaValidatorInput, re: &Regex) -> bool {
         match &self.subject {
             SubjectDescriptor::MemberSubject => {
-                let re = Regex::new(&input.member_url_regex).unwrap();
                 if !re.is_match(&input.subject) {
                     return false;
                 };

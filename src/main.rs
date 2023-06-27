@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let notice_frequency = 1000usize;
     let path = PathBuf::from("/home/id357/Documents/PhD/coding/comunica_filter_benchmark/evaluation/data/dahcc_1_participant/data.ttl");
     let large_file = false;
-    read_datadump(path, data_injection_config, notice_frequency, large_file)?;
+    read_datadump(path, &data_injection_config, notice_frequency, large_file)?;
 
     println!("--- Fragmentation finished---");
     Ok(())

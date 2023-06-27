@@ -1,17 +1,18 @@
 use super::config::*;
 use super::domain::*;
-use regex::internal::Input;
 use rio_api::parser::TriplesParser;
 use rio_turtle;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs::{read_to_string, File};
-use std::io::{prelude::*, BufReader};
+use std::io::BufReader;
 use std::path::PathBuf;
+use regex;
+
 
 pub fn read_datadump(
     path_data_dump: PathBuf,
-    data_injection_config: Config,
+    data_injection_config: &Config,
     notice_frequency: usize,
     large_file: bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -34,6 +35,7 @@ pub fn read_datadump(
         resp
     };
     let mut n_members_sorted = 0usize;
+    let re_member_id = regex::Regex::new(&data_injection_config.member_url_regex).unwrap();
 
     let parsing_function = &mut |t: rio_api::model::Triple| -> Result<(), Box<dyn Error>> {
         // we give an id to the member we suppose that the first triple as has a subject the member IRI
@@ -60,8 +62,7 @@ pub fn read_datadump(
         // we check the property of the member if they match the schema
         data_injection_config
             .schema
-            .clone()
-            .into_iter()
+            .iter()
             .enumerate()
             .for_each(|(i, schema)| {
                 let input = SchemaValidatorInput {
@@ -71,7 +72,7 @@ pub fn read_datadump(
                     member_url_regex: data_injection_config.member_url_regex.clone(),
                     related_subject: HashSet::new(),
                 };
-                if schema.is_valid(&input) {
+                if schema.is_valid(&input, &re_member_id) {
                     valid_properties[i] = true;
                 }
             });
