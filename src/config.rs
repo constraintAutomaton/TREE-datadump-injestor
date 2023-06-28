@@ -9,7 +9,7 @@ pub struct Config {
     pub member_url_regex: String,
     pub schema: Vec<Schema>,
     pub n_members: usize,
-    pub date_field: String
+    pub date_field: String,
 }
 impl Config {
     pub fn new(config_path: PathBuf) -> Self {
@@ -26,10 +26,10 @@ pub struct Schema {
     pub object: Option<SubjectDescriptor>,
 }
 impl Schema {
-    pub fn is_valid(&self, input: &SchemaValidatorInput, re: &Regex) -> bool {
+    pub fn is_valid(&self, input: &SchemaValidatorInput) -> bool {
         match &self.subject {
             SubjectDescriptor::MemberSubject => {
-                if !re.is_match(&input.subject) {
+                if input.subject != input.member_id {
                     return false;
                 };
             }
@@ -57,5 +57,6 @@ pub struct SchemaValidatorInput {
     pub subject: String,
     pub predicate: String,
     pub object: String,
+    pub member_id: String,
     pub related_subject: HashSet<String>,
 }

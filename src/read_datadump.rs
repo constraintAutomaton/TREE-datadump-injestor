@@ -40,7 +40,10 @@ pub fn read_datadump(
     let parsing_function = &mut |t: rio_api::model::Triple| -> Result<(), Box<dyn Error>> {
         // we give an id to the member we suppose that the first triple as has a subject the member IRI
         if current_member.properties.len() == 0 {
-            current_member.id = t.subject.to_string();
+            let id = t.subject.to_string();
+            if re_member_id.is_match(&id) {
+                current_member.id = id;
+            }
         }
 
         // we add the triple as a property of the member
@@ -53,7 +56,8 @@ pub fn read_datadump(
                     chrono::NaiveDateTime::parse_from_str(
                         &value.to_string(),
                         "%Y-%m-%dT%H:%M:%S.%f",
-                    )?.timestamp()
+                    )?
+                    .timestamp()
                 } else {
                     panic!("the date object is not typed '{:?}'", t.to_string());
                 }
@@ -72,9 +76,10 @@ pub fn read_datadump(
                     subject: t.subject.to_string(),
                     predicate: t.predicate.to_string(),
                     object: t.object.to_string(),
+                    member_id: current_member.id.clone(),
                     related_subject: HashSet::new(),
                 };
-                if schema.is_valid(&input, &re_member_id) {
+                if schema.is_valid(&input) {
                     valid_properties[i] = true;
                 }
             });
