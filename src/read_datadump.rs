@@ -1,5 +1,7 @@
 use super::config::*;
 use super::member::*;
+use chrono;
+use regex;
 use rio_api::parser::TriplesParser;
 use rio_turtle;
 use std::collections::HashSet;
@@ -7,8 +9,6 @@ use std::error::Error;
 use std::fs::{read_to_string, File};
 use std::io::BufReader;
 use std::path::PathBuf;
-use regex;
-
 
 pub fn read_datadump(
     path_data_dump: PathBuf,
@@ -50,7 +50,10 @@ pub fn read_datadump(
         if t.predicate.to_string() == data_injection_config.date_field {
             current_member.date = if let rio_api::model::Term::Literal(literal) = t.object {
                 if let rio_api::model::Literal::Typed { value, datatype: _ } = literal {
-                    value.to_string()
+                    chrono::NaiveDateTime::parse_from_str(
+                        &value.to_string(),
+                        "%Y-%m-%dT%H:%M:%S.%f",
+                    )?.timestamp()
                 } else {
                     panic!("the date object is not typed '{:?}'", t.to_string());
                 }
@@ -97,11 +100,8 @@ pub fn read_datadump(
     if large_file {
         rio_turtle::TurtleParser::new(BufReader::new(file), None).parse_all(parsing_function)?;
     } else {
-        rio_turtle::TurtleParser::new(
-            read_to_string(path_data_dump)?.as_str().as_ref(),
-            None,
-        )
-        .parse_all(parsing_function)?;
+        rio_turtle::TurtleParser::new(read_to_string(path_data_dump)?.as_str().as_ref(), None)
+            .parse_all(parsing_function)?;
     };
 
     Ok(())

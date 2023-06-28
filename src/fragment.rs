@@ -7,8 +7,8 @@ use std::path::PathBuf;
 pub struct Fragment {
     filename: PathBuf,
     pub boundary: Boundary,
-    size: usize,
     members_to_materialized: Vec<Member>,
+    max_size_cache: usize,
 }
 
 impl Fragment {
@@ -17,12 +17,12 @@ impl Fragment {
         Self {
             filename: filename.clone(),
             boundary: Boundary::default(),
-            size: 0usize,
             members_to_materialized: Vec::with_capacity(max_size_cache),
+            max_size_cache,
         }
     }
 
-    pub async fn materialize(&self) {
+    pub fn materialize(&mut self) {
         let mut file = fs::OpenOptions::new()
             .append(true)
             .open(&self.filename.clone())
@@ -35,23 +35,67 @@ impl Fragment {
             resp
         };
         file.write_all(buffer.as_bytes()).unwrap();
+        self.members_to_materialized = Vec::new();
     }
 
-    pub fn len(&self) -> usize {
-        self.size
+    pub fn insert(
+        &mut self,
+        member: Member,
+        relation_to_boundary: RelationToBoundary,
+    ) -> Result<(), &str> {
+        if self.max_size_cache >= self.members_to_materialized.len() + 1 {
+            return Err("the member cache is full it has to be materialized");
+        }
+        self.members_to_materialized.push(member.clone());
+        match relation_to_boundary {
+            RelationToBoundary::Lower(_) => self.boundary.lower = member.date,
+            RelationToBoundary::Greater(_) => self.boundary.upper = member.date,
+            _ => {}
+        };
+        Ok(())
     }
 }
 
 pub struct Boundary {
-    pub up: chrono::NaiveDate,
-    pub down: chrono::NaiveDate,
+    pub upper: i64,
+    pub lower: i64,
+}
+
+impl Boundary {
+    pub fn relation_with_boundery(&self, date: i64) -> RelationToBoundary {
+        if date >= self.lower && date <= self.upper {
+            RelationToBoundary::InBetween
+        } else if date > self.upper {
+            RelationToBoundary::Greater(self.upper - date)
+        } else {
+            RelationToBoundary::Lower(self.lower - date)
+        }
+    }
 }
 
 impl Default for Boundary {
     fn default() -> Self {
         Self {
-            up: chrono::NaiveDate::MAX,
-            down: chrono::NaiveDate::MIN,
+            upper: i64::MAX,
+            lower: i64::MIN,
+        }
+    }
+}
+
+pub enum RelationToBoundary {
+    InBetween,
+    Lower(i64),
+    Greater(i64),
+}
+
+impl From<i64> for RelationToBoundary {
+    fn from(item: i64) -> Self {
+        if item == 0 {
+            RelationToBoundary::InBetween
+        } else if item > 0 {
+            RelationToBoundary::Greater(item)
+        } else {
+            RelationToBoundary::Lower(item)
         }
     }
 }
@@ -70,7 +114,7 @@ impl SimpleFragmentation {
                     resp.push(i.to_string());
                     resp
                 };
-                resp.push(Fragment::new(&fragment_path, max_size_cache))
+                resp.push(Fragment::new(&fragment_path, max_size_cache));
             }
             resp
         };

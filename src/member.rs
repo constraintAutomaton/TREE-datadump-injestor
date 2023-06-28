@@ -3,7 +3,7 @@ use std::fmt;
 #[derive(Default, Debug, Clone)]
 pub struct Member {
     pub properties: Vec<String>,
-    pub date: String,
+    pub date: i64,
     pub id: String,
 }
 
