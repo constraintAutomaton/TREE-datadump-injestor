@@ -1,4 +1,5 @@
 use super::member::Member;
+use rand::Rng;
 use std::fs;
 use std::io::Write;
 use std::ops::Deref;
@@ -129,14 +130,21 @@ impl SimpleFragmentation {
             let mut scores: Vec<RelationToBoundary> = Vec::with_capacity(self.n_fragments);
             let mut max: i64 = i64::MIN;
             let mut pos = 0;
+            let mut all_zero_score = true;
             for (i, fragment) in self.fragments.iter().enumerate() {
                 let score = fragment.boundary.relation_with_boundery(member.date);
                 let score_number: i64 = score.into();
                 if score_number > max {
                     max = score_number;
                     pos = i;
+                    if score_number != 0i64 {
+                        all_zero_score = false;
+                    }
                 }
                 scores.push(score);
+            }
+            if all_zero_score {
+                pos = rand::thread_rng().gen_range(0..self.fragments.len());
             }
 
             if let Err(_) = self.fragments[pos].insert(member, scores[pos]) {
