@@ -1,7 +1,7 @@
 use super::member::Member;
-use chrono;
 use std::fs;
 use std::io::Write;
+use std::ops::Deref;
 use std::path::PathBuf;
 
 pub struct Fragment {
@@ -40,7 +40,7 @@ impl Fragment {
 
     pub fn insert(
         &mut self,
-        member: Member,
+        member: &Member,
         relation_to_boundary: RelationToBoundary,
     ) -> Result<(), &str> {
         if self.max_size_cache >= self.members_to_materialized.len() + 1 {
@@ -82,26 +82,26 @@ impl Default for Boundary {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum RelationToBoundary {
     InBetween,
     Lower(i64),
     Greater(i64),
 }
 
-impl From<i64> for RelationToBoundary {
-    fn from(item: i64) -> Self {
-        if item == 0 {
-            RelationToBoundary::InBetween
-        } else if item > 0 {
-            RelationToBoundary::Greater(item)
-        } else {
-            RelationToBoundary::Lower(item)
+impl Into<i64> for RelationToBoundary {
+    fn into(self) -> i64 {
+        match self {
+            Self::InBetween => 0i64,
+            Self::Greater(val) => val,
+            Self::Lower(val) => val,
         }
     }
 }
 
 pub struct SimpleFragmentation {
     fragments: Vec<Fragment>,
+    n_fragments: usize,
 }
 
 impl SimpleFragmentation {
@@ -118,6 +118,31 @@ impl SimpleFragmentation {
             }
             resp
         };
-        Self { fragments }
+        Self {
+            fragments,
+            n_fragments,
+        }
+    }
+
+    pub fn insert(&mut self, members: Vec<Member>) {
+        for member in members.iter() {
+            let mut scores: Vec<RelationToBoundary> = Vec::with_capacity(self.n_fragments);
+            let mut max: i64 = i64::MIN;
+            let mut pos = 0;
+            for (i, fragment) in self.fragments.iter().enumerate() {
+                let score = fragment.boundary.relation_with_boundery(member.date);
+                let score_number: i64 = score.into();
+                if score_number > max {
+                    max = score_number;
+                    pos = i;
+                }
+                scores.push(score);
+            }
+
+            if let Err(_) = self.fragments[pos].insert(member, scores[pos]) {
+                self.fragments[pos].materialize();
+                self.fragments[pos].insert(member, scores[pos]).unwrap();
+            }
+        }
     }
 }
