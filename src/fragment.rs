@@ -3,11 +3,13 @@ use super::tree::*;
 use async_trait;
 use chrono;
 use futures;
+use futures::stream::StreamExt;
 use std::fmt;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use uuid;
+
 pub struct Fragment {
     filename: PathBuf,
     boundary: Boundary,
@@ -129,7 +131,7 @@ impl SimpleFragmentation {
         fragmentation_property: String,
     ) -> Self {
         let fragments = {
-            let mut resp = Vec::with_capacity(n_fragments);
+            let mut tasks = Vec::with_capacity(n_fragments);
             let mut current_lower_bound = lowest_date;
 
             let increment = ((highest_date - lowest_date) as f32 / n_fragments as f32) as i64;
@@ -140,7 +142,7 @@ impl SimpleFragmentation {
                     resp
                 };
 
-                resp.push(Fragment::new(
+                tasks.push(Fragment::new(
                     fragment_path,
                     max_size_cache,
                     if current_lower_bound == lowest_date {
@@ -156,7 +158,10 @@ impl SimpleFragmentation {
                 ));
                 current_lower_bound += increment;
             }
-            futures::future::join_all(resp).await
+            let task_stream: futures_util::stream::FuturesUnordered<_> =
+                tasks.into_iter().collect();
+            let resp: Vec<Fragment> = task_stream.collect().await;
+            resp
         };
         for (i, fragment) in fragments.iter().enumerate() {
             println!("the boundaries of {i} are {}", fragment.boundary(),);
@@ -176,7 +181,9 @@ impl SimpleFragmentation {
         for fragment in self.fragments.iter_mut() {
             materilize_tasks.push(fragment.materialize());
         }
-        futures::future::join_all(materilize_tasks).await;
+        let task_stream: futures_util::stream::FuturesUnordered<_> =
+            materilize_tasks.into_iter().collect();
+        task_stream.collect().await
     }
 
     fn generate_root_node(&self) {

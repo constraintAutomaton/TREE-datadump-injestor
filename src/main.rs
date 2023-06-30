@@ -1,9 +1,12 @@
+mod cli;
 mod config;
 mod fragment;
 mod member;
 mod read_datadump;
 mod tree;
 
+use clap::Parser;
+use cli::*;
 use config::*;
 use humantime::format_duration;
 use read_datadump::*;
@@ -15,17 +18,26 @@ use tokio;
 async fn main() {
     let start = time::Instant::now();
     // will be CLI param
-    let config_path = PathBuf::from("./config.json");
+    let cli = Cli::parse();
+    let config_path = cli.config_path.unwrap_or(PathBuf::from("./config.json"));
     let data_injection_config = Config::new(config_path);
-    let notice_frequency = 1_000usize;
-    let max_cache_element = 100;
-    let n_fragments = 1000;
-    let out_path = PathBuf::from("./generated");
+    let notice_frequency = cli.frequency_notification;
+    let n_fragments = cli.n_fragments;
+    let max_cache_element: usize = if data_injection_config.n_members / (n_fragments * 20) != 0usize
+    {
+        data_injection_config.n_members / (n_fragments * 20)
+    } else {
+        1usize
+    };
+    let out_path = cli.output_path.unwrap_or(PathBuf::from("./generated"));
 
-    let path = PathBuf::from("/home/id357/Documents/PhD/coding/comunica_filter_benchmark/evaluation/data/dahcc_1_participant/data.ttl");
+    let data_dump_path = cli.data_dump_path.unwrap_or(PathBuf::from(
+        "../comunica_filter_benchmark/evaluation/data/dahcc_1_participant/data.ttl",
+    ));
+
     let large_file = false;
     read_datadump(
-        path,
+        data_dump_path,
         &data_injection_config,
         notice_frequency,
         large_file,

@@ -16,7 +16,7 @@ use std::thread;
 use tokio;
 
 pub fn read_datadump(
-    path_data_dump: PathBuf,
+    data_dump_path: PathBuf,
     data_injection_config: &Config,
     notice_frequency: usize,
     large_file: bool,
@@ -24,7 +24,7 @@ pub fn read_datadump(
     n_fragments: usize,
     out_path: PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    let file = File::open(path_data_dump.clone())?;
+    let file = File::open(data_dump_path.clone())?;
     let mut current_member = Member::default();
     let n_properties = data_injection_config.schema.len();
     let create_empy_valid_property = || -> Vec<bool> {
@@ -154,7 +154,7 @@ pub fn read_datadump(
     if large_file {
         rio_turtle::TurtleParser::new(BufReader::new(file), None).parse_all(parsing_function)?;
     } else {
-        rio_turtle::TurtleParser::new(read_to_string(path_data_dump)?.as_str().as_ref(), None)
+        rio_turtle::TurtleParser::new(read_to_string(data_dump_path)?.as_str().as_ref(), None)
             .parse_all(parsing_function)?;
     };
     std::mem::drop(tx_member);
