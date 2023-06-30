@@ -8,6 +8,9 @@ mod tree;
 use clap::Parser;
 use cli::*;
 use config::*;
+use futures;
+use futures::stream::StreamExt;
+use glob;
 use humantime::format_duration;
 use read_datadump::*;
 use std::path::PathBuf;
@@ -30,12 +33,13 @@ async fn main() {
         1usize
     };
     let out_path = cli.output_path.unwrap_or(PathBuf::from("./generated"));
+    delete_previous_file(&out_path).await;
 
     let data_dump_path = cli.data_dump_path.unwrap_or(PathBuf::from(
         "../comunica_filter_benchmark/evaluation/data/dahcc_1_participant/data.ttl",
     ));
 
-    let large_file = false;
+    let large_file = cli.large_file;
     read_datadump(
         data_dump_path,
         &data_injection_config,
@@ -50,4 +54,23 @@ async fn main() {
 
     println!("Time elapsed is {}", format_duration(duration));
     println!("--- Fragmentation finished---");
+}
+
+async fn delete_previous_file(out_path: &PathBuf) {
+    let mut tasks = Vec::new();
+    println!("{}/*.ttl", out_path.as_path().to_str().unwrap());
+    for path in glob::glob(&format!("{}/*.ttl", out_path.as_path().to_str().unwrap())).unwrap() {
+        tasks.push(async {
+            match path {
+                Ok(path) => {
+                    println!("Removing file: {:?}", path.display());
+                    std::fs::remove_file(path).unwrap();
+                }
+                Err(e) => panic!("{e}"),
+            }
+        });
+    }
+    let task_stream: futures_util::stream::FuturesUnordered<_> = tasks.into_iter().collect();
+
+    let _: Vec<_> = task_stream.collect().await;
 }

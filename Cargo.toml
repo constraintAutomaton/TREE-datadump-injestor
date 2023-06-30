@@ -23,3 +23,4 @@ serde_json = "1.0.99"
 tokio = {version="1.29.1", features = ["rt-multi-thread", "macros"]}
 uuid = {version="1.4.0", features = ["v4", "fast-rng", "macro-diagnostics"]}
 clap = {version="4.3.2", features = ["derive"] }
+glob = "0.3.1"
