@@ -12,6 +12,7 @@ pub struct Config {
     pub date_field: String,
     pub highest_date: chrono::NaiveDateTime,
     pub lowest_date: chrono::NaiveDateTime,
+    pub server_address: String,
 }
 impl Config {
     pub fn new(config_path: PathBuf) -> Self {
