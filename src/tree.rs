@@ -3,38 +3,29 @@ use derive_new;
 use rio_api;
 use std::fmt;
 
+#[allow(dead_code)]
 #[derive(Clone, PartialEq, Eq, Debug)]
 /// The type of the relationship.
 /// https://treecg.github.io/specification/#vocabulary
 pub enum RelationOperator {
-    #[allow(dead_code)]
     /// All elements in the related node have this prefix.
     PrefixRelation,
-    #[allow(dead_code)]
     /// All elements in the related node have this substring.
     SubstringRelation,
-    #[allow(dead_code)]
     /// All members of this related node end with this suffix.
     SuffixRelation,
-    #[allow(dead_code)]
     /// The related Node’s members are greater than the value. For string comparison,
     /// this relation can refer to a comparison configuration.
     GreaterThanRelation,
-
     /// Similar to GreaterThanRelation.
     GreaterThanOrEqualToRelation,
-
-    #[allow(dead_code)]
     /// Similar to GreaterThanRelation.
     LessThanRelation,
     /// Similar to GreaterThanRelation.
     LessThanOrEqualToRelation,
-
-    #[allow(dead_code)]
     /// Similar to GreaterThanRelation.
     EqualThanRelation,
 
-    #[allow(dead_code)]
     /// A contains b iff no points of b lie in the exterior of a, and at least one point
     /// of the interior of b lies in the interior of a.
     /// reference http://lin-ear-th-inking.blogspot.com/2007/06/subtleties-of-ogc-covers-spatial.html
