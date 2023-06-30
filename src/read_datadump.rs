@@ -1,14 +1,19 @@
 use super::config::*;
+use super::fragment::*;
 use super::member::*;
 use chrono;
 use regex;
 use rio_api::parser::TriplesParser;
 use rio_turtle;
 use std::collections::HashSet;
+use std::collections::VecDeque;
 use std::error::Error;
 use std::fs::{read_to_string, File};
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::sync::mpsc;
+use std::thread;
+use tokio;
 
 pub fn read_datadump(
     path_data_dump: PathBuf,
@@ -34,9 +39,13 @@ pub fn read_datadump(
         }
         resp
     };
-    let mut n_members_sorted = 0usize;
+
+    let mut n_member_parsed = 0usize;
     let re_member_id = regex::Regex::new(&data_injection_config.member_url_regex).unwrap();
 
+    let (tx_member, rx_member) = mpsc::channel();
+
+    let handle = tokio::runtime::Handle::current();
     let parsing_function = &mut |t: rio_api::model::Triple| -> Result<(), Box<dyn Error>> {
         // we give an id to the member we suppose that the first triple as has a subject the member IRI
         if current_member.properties.len() == 0 {
@@ -86,28 +95,67 @@ pub fn read_datadump(
 
         // the current member is materialized if it is complete
         if valid_properties == full_property_valid {
-            //println!("{:?}", current_member);
+            tx_member.send(current_member.clone()).unwrap();
             current_member = Member::new(n_properties);
             valid_properties = create_empy_valid_property();
-            n_members_sorted += 1;
-            if n_members_sorted % notice_frequency == 0 {
+            n_member_parsed += 1;
+            if n_member_parsed % notice_frequency == 0 {
                 println!(
                     "--- {:} out of {:} ({:?}%)---",
-                    n_members_sorted,
+                    n_member_parsed,
                     data_injection_config.n_members,
-                    (n_members_sorted as f32 / data_injection_config.n_members as f32) * 100f32
+                    (n_member_parsed as f32 / data_injection_config.n_members as f32) * 100f32
                 );
             }
         }
-        //println!("{:?}", valid_properties);
         Ok(())
     };
+
+    let highest_date = data_injection_config.highest_date.timestamp();
+    let lowest_date = data_injection_config.lowest_date.timestamp();
+
+    let add_to_the_fragmentation = move || {
+        let max_cache_element = 1_000;
+        let n_fragments = 10;
+        let out_path = PathBuf::from("./generated");
+
+        let mut fragmentation = futures::executor::block_on(SimpleFragmentation::new(
+            n_fragments,
+            max_cache_element,
+            &out_path,
+            highest_date,
+            lowest_date,
+        ));
+        handle.block_on(async {
+            let mut member_queue: VecDeque<Member> =
+                VecDeque::with_capacity(fragmentation.max_size_cache());
+            loop {
+                if let Ok(member) = rx_member.recv() {
+                    member_queue.push_front(member);
+                } else {
+                    for member in member_queue.iter() {
+                        fragmentation.insert(member).await;
+                    }
+                    fragmentation.finalize().await;
+                    break;
+                }
+                if let Some(member) = member_queue.pop_back() {
+                    fragmentation.insert(&member).await;
+                }
+            }
+        });
+    };
+
+    let worker = thread::spawn(add_to_the_fragmentation);
+
     if large_file {
         rio_turtle::TurtleParser::new(BufReader::new(file), None).parse_all(parsing_function)?;
     } else {
         rio_turtle::TurtleParser::new(read_to_string(path_data_dump)?.as_str().as_ref(), None)
             .parse_all(parsing_function)?;
     };
+    std::mem::drop(tx_member);
+    worker.join().unwrap();
 
     Ok(())
 }

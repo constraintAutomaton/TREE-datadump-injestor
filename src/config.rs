@@ -1,3 +1,4 @@
+use chrono;
 use serde;
 use std::collections::HashSet;
 use std::fs::read_to_string;
@@ -9,6 +10,8 @@ pub struct Config {
     pub schema: Vec<Schema>,
     pub n_members: usize,
     pub date_field: String,
+    pub highest_date: chrono::NaiveDateTime,
+    pub lowest_date: chrono::NaiveDateTime,
 }
 impl Config {
     pub fn new(config_path: PathBuf) -> Self {
