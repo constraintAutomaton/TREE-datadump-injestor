@@ -132,8 +132,8 @@ impl SimpleFragmentation {
             let mut resp = Vec::with_capacity(n_fragments);
             let mut current_lower_bound = lowest_date;
 
-            let increment = (highest_date - lowest_date) / n_fragments  as i64;
-            for i in 1..n_fragments {
+            let increment = ((highest_date - lowest_date) as f32 / n_fragments as f32) as i64;
+            for i in 1..n_fragments + 1 {
                 let fragment_path = {
                     let mut resp = folder.clone();
                     resp.push(format!("{}.ttl", i));
@@ -154,7 +154,7 @@ impl SimpleFragmentation {
                         current_lower_bound + increment
                     },
                 ));
-                current_lower_bound += increment + 1;
+                current_lower_bound += increment;
             }
             futures::future::join_all(resp).await
         };
@@ -222,7 +222,7 @@ impl SimpleFragmentation {
                     .format(date_time_format)
                     .to_string(),
                 format!("{}{}", self.server_address, fragment_id),
-                RelationOperator::LessThanOrEqualToRelation,
+                RelationOperator::LessThanRelation,
                 format!("{}0.ttl", self.server_address),
                 relation_id_1,
             ));
