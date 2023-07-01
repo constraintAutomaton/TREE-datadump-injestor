@@ -62,7 +62,10 @@ pub fn parse_datadump(
         current_member.properties.push(t.to_string());
 
         // we add the date into a specific field because it is the bases of the fragmentation
-        if t.predicate.to_string().contains(&data_injection_config.date_field) {
+        if t.predicate
+            .to_string()
+            .contains(&data_injection_config.date_field)
+        {
             current_member.date = if let rio_api::model::Term::Literal(literal) = t.object {
                 if let rio_api::model::Literal::Typed { value, datatype: _ } = literal {
                     chrono::NaiveDateTime::parse_from_str(
@@ -114,6 +117,7 @@ pub fn parse_datadump(
         Ok(())
     };
 
+    // we clone the values because we have to move them inside the thread
     let highest_date = data_injection_config.highest_date.timestamp();
     let lowest_date = data_injection_config.lowest_date.timestamp();
     let server_address = data_injection_config.server_address.clone();
