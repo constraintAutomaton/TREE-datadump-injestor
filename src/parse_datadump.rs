@@ -15,7 +15,7 @@ use std::sync::mpsc;
 use std::thread;
 use tokio;
 
-pub fn read_datadump(
+pub fn parse_datadump(
     data_dump_path: PathBuf,
     data_injection_config: &Config,
     notice_frequency: usize,

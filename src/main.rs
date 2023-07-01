@@ -2,7 +2,7 @@ mod cli;
 mod config;
 mod fragment;
 mod member;
-mod read_datadump;
+mod parse_datadump;
 mod tree;
 
 use clap::Parser;
@@ -12,7 +12,7 @@ use futures;
 use futures::stream::StreamExt;
 use glob;
 use humantime::format_duration;
-use read_datadump::*;
+use parse_datadump::*;
 use std::path::PathBuf;
 use std::time;
 use tokio;
@@ -39,7 +39,7 @@ async fn main() {
     ));
 
     let large_file = cli.large_file;
-    read_datadump(
+    parse_datadump(
         data_dump_path,
         &data_injection_config,
         notice_frequency,
