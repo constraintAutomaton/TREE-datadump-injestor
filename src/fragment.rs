@@ -134,11 +134,11 @@ impl SimpleFragmentation {
             let mut tasks = Vec::with_capacity(n_fragments);
             let mut current_lower_bound = lowest_date;
 
-            let increment = ((highest_date - lowest_date) as f32 / n_fragments as f32) as i64;
-            for i in 1..n_fragments + 1 {
+            let increment = ((highest_date - lowest_date) as f64 / n_fragments as f64) as i64;
+            for i in 0..n_fragments {
                 let fragment_path = {
                     let mut resp = folder.clone();
-                    resp.push(format!("{}.ttl", i));
+                    resp.push(format!("{}.ttl", i + 1));
                     resp
                 };
 
@@ -150,7 +150,7 @@ impl SimpleFragmentation {
                     } else {
                         current_lower_bound
                     },
-                    if current_lower_bound + increment >= highest_date {
+                    if i == n_fragments - 1 {
                         chrono::NaiveDateTime::MAX.timestamp()
                     } else {
                         current_lower_bound + increment

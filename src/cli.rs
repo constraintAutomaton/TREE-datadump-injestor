@@ -29,6 +29,6 @@ pub(crate) struct Cli {
     pub data_dump_path: Option<PathBuf>,
 
     /// If set to false will put the whole file in memory, with false will read the file line by line
-    #[arg(short, long,default_value_t=true, action = clap::ArgAction::SetTrue)]
+    #[arg(short, long,default_value_t=false, action = clap::ArgAction::SetTrue)]
     pub large_file: bool,
 }

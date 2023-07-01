@@ -20,7 +20,6 @@ use tokio;
 #[tokio::main]
 async fn main() {
     let start = time::Instant::now();
-    // will be CLI param
     let cli = Cli::parse();
     let config_path = cli.config_path.unwrap_or(PathBuf::from("./config.json"));
     let data_injection_config = Config::new(config_path);
