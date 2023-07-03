@@ -1,6 +1,6 @@
+use super::fragment::*;
 use crate::member::Member;
 use crate::tree::*;
-use super::fragment::*;
 use async_trait;
 use chrono;
 use futures;
@@ -32,7 +32,8 @@ impl OneAryTreeFragmentation {
             let tasks = futures_util::stream::FuturesUnordered::new();
             let mut current_lower_bound = lowest_date;
 
-            let increment = ((highest_date as f32 - lowest_date as f32) / n_fragments as f32).ceil() as i64;
+            let increment =
+                ((highest_date as f32 - lowest_date as f32) / n_fragments as f32).ceil() as i64;
             for i in 0..n_fragments {
                 let fragment_path = {
                     let mut resp = folder.clone();
@@ -73,13 +74,12 @@ impl OneAryTreeFragmentation {
     }
 
     pub async fn materialize(&mut self) {
-        let mut materialize_tasks = Vec::with_capacity(self.n_fragments);
+        let materialize_tasks = futures_util::stream::FuturesUnordered::new();
         for fragment in self.fragments.iter_mut() {
             materialize_tasks.push(fragment.materialize());
         }
-        let task_stream: futures_util::stream::FuturesUnordered<_> =
-            materialize_tasks.into_iter().collect();
-        task_stream.collect().await
+
+        let _: Vec<_> = materialize_tasks.collect().await;
     }
 
     fn generate_root_node(&self) {
@@ -117,7 +117,7 @@ impl OneAryTreeFragmentation {
         file.write_all(buffer.as_bytes()).unwrap();
     }
 
-    pub (super) fn relations_to_string(relations: Vec<Relation>) -> String {
+    pub(super) fn relations_to_string(relations: Vec<Relation>) -> String {
         let mut resp = String::new();
         for relation in relations {
             resp.push_str(&relation.to_string());
@@ -128,7 +128,7 @@ impl OneAryTreeFragmentation {
 
     /// It simply delete the fragment with a size of 0, and merge two adjacent fragment
     /// if the current fragment has 10 times less members than the average.
-    pub (super) async fn rebalance(&mut self) {
+    pub(super) async fn rebalance(&mut self) {
         self.fragments.retain(|fragment| {
             if fragment.size() == 0 {
                 fragment.clear_file();
