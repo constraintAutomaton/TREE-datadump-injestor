@@ -124,7 +124,7 @@ pub fn parse_datadump(
     let date_field = data_injection_config.date_field.clone();
     let add_to_the_fragmentation = move || {
         handle.block_on(async {
-            let mut fragmentation = OneAryTreeFragmentation::new(
+            let mut fragmentation = LinkedListFragmentation::new(
                 n_fragments,
                 max_cache_element,
                 &out_path,

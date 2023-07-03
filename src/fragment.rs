@@ -51,13 +51,15 @@ impl Fragment {
         &self.filename
     }
 
-    pub async fn materialize_relation(&self, relation: &Relation) {
+    pub async fn materialize_relation(&self, relations: Vec<Relation>) {
         let mut file = fs::OpenOptions::new()
             .append(true)
             .open(&self.filename)
             .unwrap();
-        let buffer = relation.to_string();
-        file.write_all(buffer.as_bytes()).unwrap();
+        for relation in relations {
+            let buffer = relation.to_string();
+            file.write_all(buffer.as_bytes()).unwrap();
+        }
     }
     pub async fn materialize(&mut self) {
         if self.members_to_materialized.len() > 0 {
@@ -135,6 +137,7 @@ impl Boundary {
                 server_address,
                 destination_id,
                 current_id,
+                RelationOperator::LessThanRelation,
             ));
         }
 
@@ -145,6 +148,7 @@ impl Boundary {
                 server_address,
                 destination_id,
                 current_id,
+                RelationOperator::GreaterThanOrEqualToRelation,
             ));
         }
 
@@ -157,6 +161,7 @@ impl Boundary {
         server_address: &String,
         destination_id: &String,
         current_id: &String,
+        relation_type: RelationOperator,
     ) -> Relation {
         Relation::new(
             fragmentation_property.clone(),
@@ -165,7 +170,7 @@ impl Boundary {
                 .format(DATE_TIME_FORMAT)
                 .to_string(),
             format!("{server_address}{destination_id}"),
-            RelationOperator::LessThanRelation,
+            relation_type,
             format!("{server_address}{current_id}"),
             uuid::Uuid::new_v4().to_string(),
         )
@@ -186,6 +191,16 @@ pub trait Fragmentation {
     async fn insert(&mut self, member: &Member);
     async fn finalize(&mut self);
     fn max_size_cache(&self) -> usize;
+    fn fragments(&self) -> &Vec<Fragment>;
+    fn print_summary(&self) {
+        for fragment in self.fragments().iter() {
+            println!(
+                "the boundaries of {fragment} are {} and it has {} members",
+                fragment.boundary,
+                fragment.len()
+            );
+        }
+    }
 }
 
 pub struct OneAryTreeFragmentation {
@@ -208,7 +223,7 @@ impl OneAryTreeFragmentation {
         fragmentation_property: String,
     ) -> Self {
         let fragments = {
-            let mut tasks = Vec::with_capacity(n_fragments);
+            let tasks = futures_util::stream::FuturesUnordered::new();
             let mut current_lower_bound = lowest_date;
 
             let increment = (highest_date - lowest_date) / n_fragments as i64;
@@ -235,9 +250,7 @@ impl OneAryTreeFragmentation {
                 ));
                 current_lower_bound += increment;
             }
-            let task_stream: futures_util::stream::FuturesUnordered<_> =
-                tasks.into_iter().collect();
-            let resp: Vec<Fragment> = task_stream.collect().await;
+            let resp: Vec<Fragment> = tasks.collect().await;
             resp
         };
         for (i, fragment) in fragments.iter().enumerate() {
@@ -310,7 +323,14 @@ impl OneAryTreeFragmentation {
     /// It simply delete the fragment with a size of 0, and merge two adjacent fragment
     /// if the current fragment has 10 times less members than the average.
     async fn rebalance(&mut self) {
-        self.fragments.retain(|fragment| fragment.size != 0);
+        self.fragments.retain(|fragment| {
+            if fragment.size == 0 {
+                fragment.clear_file();
+                false
+            } else {
+                true
+            }
+        });
         self.n_fragments = self.fragments.len();
     }
 }
@@ -334,14 +354,11 @@ impl Fragmentation for OneAryTreeFragmentation {
         self.materialize().await;
         self.rebalance().await;
         self.generate_root_node();
+        self.print_summary();
+    }
 
-        for fragment in self.fragments.iter() {
-            println!(
-                "the boundaries of {fragment} are {} and it has {} members",
-                fragment.boundary,
-                fragment.len()
-            );
-        }
+    fn fragments(&self) -> &Vec<Fragment> {
+        &self.fragments
     }
 
     fn max_size_cache(&self) -> usize {
@@ -379,8 +396,32 @@ impl LinkedListFragmentation {
         }
     }
 
+    fn generate_root_node(&self) {
+        let filename = {
+            let mut resp = self.folder.clone();
+            resp.push(format!("0.ttl"));
+            resp
+        };
+
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(filename)
+            .unwrap();
+        let relation = self.fragments[0].boundary.to_relation(
+            &"0.ttl".to_string(),
+            &"1.ttl".to_string(),
+            &self.fragmentation_property,
+            &self.server_address,
+        );
+        let buffer = OneAryTreeFragmentation::relations_to_string(relation);
+        file.write_all(buffer.as_bytes()).unwrap();
+    }
+
     async fn add_relation_to_nodes(&self) {
-        for i in 1..self.n_fragments - 1 {
+        let tasks = futures_util::stream::FuturesUnordered::new();
+        for i in 0..self.n_fragments - 1 {
             let fragment_1 = &self.one_ary_tree_fragmentation.fragments[i];
             let fragment_2 = &self.one_ary_tree_fragmentation.fragments[i + 1];
             let relations = fragment_2.boundary().to_relation(
@@ -403,11 +444,9 @@ impl LinkedListFragmentation {
                 &self.fragmentation_property,
                 &self.server_address,
             );
-            let relations = relations.clone();
-            for relation in relations {
-                fragment_1.materialize_relation(&relation).await;
-            }
+            tasks.push(fragment_1.materialize_relation(relations));
         }
+        let _: Vec<_> = tasks.collect().await;
     }
 }
 
@@ -420,11 +459,17 @@ impl Fragmentation for LinkedListFragmentation {
     async fn finalize(&mut self) {
         self.one_ary_tree_fragmentation.materialize().await;
         self.one_ary_tree_fragmentation.rebalance().await;
+        self.generate_root_node();
         self.add_relation_to_nodes().await;
+        self.print_summary();
     }
 
     fn max_size_cache(&self) -> usize {
         self.one_ary_tree_fragmentation.max_size_cache
+    }
+
+    fn fragments(&self) -> &Vec<Fragment> {
+        &self.fragments
     }
 }
 
