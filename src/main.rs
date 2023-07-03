@@ -1,6 +1,6 @@
 mod cli;
 mod config;
-mod fragment;
+mod fragmentation;
 mod member;
 mod parse_datadump;
 mod tree;
@@ -16,6 +16,7 @@ use parse_datadump::*;
 use std::path::PathBuf;
 use std::time;
 use tokio;
+use fragmentation::FragmentationTypeName;
 
 #[tokio::main]
 async fn main() {
@@ -40,8 +41,13 @@ async fn main() {
     let data_dump_path = cli.data_dump_path.unwrap_or(PathBuf::from(
         "../comunica_filter_benchmark/evaluation/data/dahcc_1_participant/data.ttl",
     ));
-
     let large_file = cli.large_file;
+    let fragmentation_type = if let Some(frag) =cli.fragmentation{
+        FragmentationTypeName::from(frag)
+    }else{
+        FragmentationTypeName::OneAryTree
+    };
+
     parse_datadump(
         data_dump_path,
         &data_injection_config,
@@ -50,6 +56,7 @@ async fn main() {
         max_cache_element,
         n_fragments,
         out_path,
+        fragmentation_type
     )
     .unwrap();
     let duration = start.elapsed();

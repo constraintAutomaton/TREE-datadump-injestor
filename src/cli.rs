@@ -31,4 +31,8 @@ pub(crate) struct Cli {
     /// If set to false will put the whole file in memory, with false will read the file line by line
     #[arg(short, long,default_value_t=false, action = clap::ArgAction::SetTrue)]
     pub large_file: bool,
+
+    /// The the type of fragmentation can be either "linkedList" or "oneAryTree" [default: "oneAryTree"]
+    #[arg(short, long)]
+    pub fragmentation: Option<String>,
 }

@@ -1,6 +1,6 @@
 use super::config::*;
-use super::fragment::*;
 use super::member::*;
+use crate::fragmentation::*;
 use chrono;
 use regex;
 use rio_api::parser::TriplesParser;
@@ -23,6 +23,7 @@ pub fn parse_datadump(
     max_cache_element: usize,
     n_fragments: usize,
     out_path: PathBuf,
+    fragmentation_type: FragmentationTypeName,
 ) -> Result<(), Box<dyn Error>> {
     let file = File::open(data_dump_path.clone())?;
     let mut current_member = Member::default();
@@ -124,7 +125,8 @@ pub fn parse_datadump(
     let date_field = data_injection_config.date_field.clone();
     let add_to_the_fragmentation = move || {
         handle.block_on(async {
-            let mut fragmentation = LinkedListFragmentation::new(
+            let mut fragmentation = factory(
+                fragmentation_type,
                 n_fragments,
                 max_cache_element,
                 &out_path,
