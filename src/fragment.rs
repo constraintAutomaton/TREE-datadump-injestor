@@ -4,12 +4,15 @@ use async_trait;
 use chrono;
 use futures;
 use futures::stream::StreamExt;
+use std::cell::RefCell;
 use std::fmt;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::rc::Rc;
 use uuid;
 
+#[derive(Clone)]
 pub struct Fragment {
     filename: PathBuf,
     boundary: Boundary,
@@ -42,11 +45,57 @@ impl Fragment {
         &self.boundary
     }
 
+    pub fn absorb_lower_fragment(&mut self, fragment: &mut Fragment) -> Result<(), &'static str> {
+        if fragment.boundary.lower < self.boundary.lower {
+            let mut file = fs::OpenOptions::new()
+                .append(true)
+                .open(&self.filename)
+                .unwrap();
+            if fragment.size < BIG_FILE_N_MEMBER {
+                let content = fs::read_to_string(&fragment.filename).unwrap();
+                file.write_all(content.as_bytes()).unwrap();
+            } else {
+                let fragment_file = fs::OpenOptions::new()
+                    .read(true)
+                    .open(&fragment.filename)
+                    .unwrap();
+
+                let chunk_size = 1_000_000_000;
+
+                loop {
+                    let mut chunk = Vec::with_capacity(chunk_size);
+                    let n = (&fragment_file)
+                        .take(chunk_size as u64)
+                        .read_to_end(&mut chunk)
+                        .unwrap();
+                    if n == 0 {
+                        break;
+                    } else {
+                        file.write_all(&chunk).unwrap();
+                    }
+                }
+            }
+            self.boundary.lower = fragment.boundary.lower;
+            self.size += fragment.size;
+            fragment.clear();
+            Ok(())
+        } else {
+            Err("the fragment don't contain data comming from before the current fragment")
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.members_to_materialized.clear();
+        self.size = 0;
+        self.boundary = Boundary::default();
+        fs::remove_file(&self.filename).expect("was not able to delete the fragment");
+    }
+
     pub async fn materialize(&mut self) {
         if self.members_to_materialized.len() > 0 {
             let mut file = fs::OpenOptions::new()
                 .append(true)
-                .open(&self.filename.clone())
+                .open(&self.filename)
                 .unwrap();
             let buffer = {
                 let mut resp = String::new();
@@ -74,7 +123,7 @@ impl Fragment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Boundary {
     pub upper: i64,
     pub lower: i64,
@@ -260,6 +309,38 @@ impl SimpleFragmentation {
         }
         resp
     }
+
+    fn average_n_members(&self) -> f32 {
+        let sum: f32 = self
+            .fragments
+            .iter()
+            .map(move |fragment| fragment.size as f32)
+            .sum();
+
+        sum / self.n_fragments as f32
+    }
+
+    async fn rebalance(&mut self) {
+        let avg_n_members = self.average_n_members();
+
+        let shared_fragments = Rc::new(RefCell::new(self.fragments.clone()));
+        for i in 0..self.n_fragments - 2 {
+            if self.fragments[i].size <= 2 * avg_n_members as usize {
+                let current_fragment = &mut shared_fragments.borrow_mut()[i];
+                let next_fragment = &mut shared_fragments.borrow_mut()[i + 1];
+                next_fragment.absorb_lower_fragment(current_fragment).unwrap();
+            }
+        }
+        self.fragments = shared_fragments.take();
+        self.fragments.retain_mut(|fragment| {
+            if fragment.size == 0 {
+                fragment.clear();
+                false
+            } else {
+                true
+            }
+        });
+    }
 }
 
 #[async_trait::async_trait]
@@ -279,6 +360,7 @@ impl Fragmentation for SimpleFragmentation {
     }
     async fn finalize(&mut self) {
         self.materialize().await;
+        self.rebalance().await;
         self.generate_root_node();
 
         for (i, fragment) in self.fragments.iter().enumerate() {
@@ -293,3 +375,5 @@ impl Fragmentation for SimpleFragmentation {
         self.max_size_cache
     }
 }
+
+const BIG_FILE_N_MEMBER: usize = 5_000_000;

@@ -17,8 +17,10 @@ use std::path::PathBuf;
 use std::time;
 use tokio;
 
+
 #[tokio::main]
 async fn main() {
+
     let start = time::Instant::now();
     let cli = Cli::parse();
     let config_path = cli.config_path.unwrap_or(PathBuf::from("./config.json"));
