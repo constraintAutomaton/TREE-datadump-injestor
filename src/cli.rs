@@ -6,7 +6,7 @@ use std::path::PathBuf;
 /// The CLI arguments
 pub(crate) struct Cli {
     /// The frequency (output by triple) from which a status report is output to the terminal
-    #[arg(short, long, default_value_t = 1_000)]
+    #[arg(long, default_value_t = 1_000)]
     pub frequency_notification: usize,
 
     /// The number of fragment of the outputed TREE document
