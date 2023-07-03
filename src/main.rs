@@ -17,16 +17,17 @@ use std::path::PathBuf;
 use std::time;
 use tokio;
 
-
 #[tokio::main]
 async fn main() {
-
     let start = time::Instant::now();
     let cli = Cli::parse();
     let config_path = cli.config_path.unwrap_or(PathBuf::from("./config.json"));
     let data_injection_config = Config::new(config_path);
     let notice_frequency = cli.frequency_notification;
     let n_fragments = cli.n_fragments;
+    if n_fragments < 2 {
+        panic!("The should be at least 2 fragments")
+    }
     let max_cache_element: usize = if data_injection_config.n_members / (n_fragments * 20) != 0usize
     {
         data_injection_config.n_members / (n_fragments * 20)

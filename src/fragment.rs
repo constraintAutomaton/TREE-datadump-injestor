@@ -4,10 +4,12 @@ use async_trait;
 use chrono;
 use futures;
 use futures::stream::StreamExt;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::fmt;
 use std::fs;
 use std::io::{Read, Write};
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 use uuid;
@@ -45,52 +47,18 @@ impl Fragment {
         &self.boundary
     }
 
-    pub fn absorb_lower_fragment(&mut self, fragment: &mut Fragment) -> Result<(), &'static str> {
-        if fragment.boundary.lower < self.boundary.lower {
-            let mut file = fs::OpenOptions::new()
-                .append(true)
-                .open(&self.filename)
-                .unwrap();
-            if fragment.size < BIG_FILE_N_MEMBER {
-                let content = fs::read_to_string(&fragment.filename).unwrap();
-                file.write_all(content.as_bytes()).unwrap();
-            } else {
-                let fragment_file = fs::OpenOptions::new()
-                    .read(true)
-                    .open(&fragment.filename)
-                    .unwrap();
-
-                let chunk_size = 1_000_000_000;
-
-                loop {
-                    let mut chunk = Vec::with_capacity(chunk_size);
-                    let n = (&fragment_file)
-                        .take(chunk_size as u64)
-                        .read_to_end(&mut chunk)
-                        .unwrap();
-                    if n == 0 {
-                        break;
-                    } else {
-                        file.write_all(&chunk).unwrap();
-                    }
-                }
-            }
-            self.boundary.lower = fragment.boundary.lower;
-            self.size += fragment.size;
-            fragment.clear();
-            Ok(())
-        } else {
-            Err("the fragment don't contain data comming from before the current fragment")
-        }
+    pub fn filename(&self) -> &PathBuf {
+        &self.filename
     }
 
-    pub fn clear(&mut self) {
-        self.members_to_materialized.clear();
-        self.size = 0;
-        self.boundary = Boundary::default();
-        fs::remove_file(&self.filename).expect("was not able to delete the fragment");
+    pub async fn materialize_relation(&self, relation: &Relation) {
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(&self.filename)
+            .unwrap();
+        let buffer = relation.to_string();
+        file.write_all(buffer.as_bytes()).unwrap();
     }
-
     pub async fn materialize(&mut self) {
         if self.members_to_materialized.len() > 0 {
             let mut file = fs::OpenOptions::new()
@@ -109,6 +77,10 @@ impl Fragment {
         }
     }
 
+    pub fn clear_file(&self) {
+        fs::remove_file(&self.filename).expect("was not able to delete the fragment");
+    }
+
     pub fn len(&self) -> usize {
         self.size
     }
@@ -123,6 +95,11 @@ impl Fragment {
     }
 }
 
+impl fmt::Display for Fragment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.filename.as_os_str().to_str().unwrap())
+    }
+}
 #[derive(Debug, Clone)]
 pub struct Boundary {
     pub upper: i64,
@@ -142,6 +119,57 @@ impl Boundary {
     pub fn is_in_between(&self, date: i64) -> bool {
         date >= self.lower && date <= self.upper
     }
+
+    pub fn to_relation(
+        &self,
+        current_id: &String,
+        destination_id: &String,
+        fragmentation_property: &String,
+        server_address: &String,
+    ) -> Vec<Relation> {
+        let mut resp: Vec<Relation> = Vec::new();
+        if self.upper < chrono::NaiveDateTime::MAX.timestamp() {
+            resp.push(Self::create_relation(
+                self.upper,
+                fragmentation_property,
+                server_address,
+                destination_id,
+                current_id,
+            ));
+        }
+
+        if self.lower > chrono::NaiveDateTime::MIN.timestamp() {
+            resp.push(Self::create_relation(
+                self.lower,
+                fragmentation_property,
+                server_address,
+                destination_id,
+                current_id,
+            ));
+        }
+
+        resp
+    }
+
+    fn create_relation(
+        time_value: i64,
+        fragmentation_property: &String,
+        server_address: &String,
+        destination_id: &String,
+        current_id: &String,
+    ) -> Relation {
+        Relation::new(
+            fragmentation_property.clone(),
+            chrono::NaiveDateTime::from_timestamp_opt(time_value, 0)
+                .unwrap()
+                .format(DATE_TIME_FORMAT)
+                .to_string(),
+            format!("{server_address}{destination_id}"),
+            RelationOperator::LessThanRelation,
+            format!("{server_address}{current_id}"),
+            uuid::Uuid::new_v4().to_string(),
+        )
+    }
 }
 
 impl Default for Boundary {
@@ -160,7 +188,7 @@ pub trait Fragmentation {
     fn max_size_cache(&self) -> usize;
 }
 
-pub struct SimpleFragmentation {
+pub struct OneAryTreeFragmentation {
     fragments: Vec<Fragment>,
     n_fragments: usize,
     max_size_cache: usize,
@@ -169,7 +197,7 @@ pub struct SimpleFragmentation {
     fragmentation_property: String,
 }
 
-impl SimpleFragmentation {
+impl OneAryTreeFragmentation {
     pub async fn new(
         n_fragments: usize,
         max_size_cache: usize,
@@ -183,7 +211,7 @@ impl SimpleFragmentation {
             let mut tasks = Vec::with_capacity(n_fragments);
             let mut current_lower_bound = lowest_date;
 
-            let increment = ((highest_date - lowest_date) as f64 / n_fragments as f64) as i64;
+            let increment = (highest_date - lowest_date) / n_fragments as i64;
             for i in 0..n_fragments {
                 let fragment_path = {
                     let mut resp = folder.clone();
@@ -194,7 +222,7 @@ impl SimpleFragmentation {
                 tasks.push(Fragment::new(
                     fragment_path,
                     max_size_cache,
-                    if current_lower_bound == lowest_date {
+                    if i == 0 {
                         chrono::NaiveDateTime::MIN.timestamp()
                     } else {
                         current_lower_bound
@@ -226,12 +254,12 @@ impl SimpleFragmentation {
     }
 
     pub async fn materialize(&mut self) {
-        let mut materilize_tasks = Vec::with_capacity(self.n_fragments);
+        let mut materialize_tasks = Vec::with_capacity(self.n_fragments);
         for fragment in self.fragments.iter_mut() {
-            materilize_tasks.push(fragment.materialize());
+            materialize_tasks.push(fragment.materialize());
         }
         let task_stream: futures_util::stream::FuturesUnordered<_> =
-            materilize_tasks.into_iter().collect();
+            materialize_tasks.into_iter().collect();
         task_stream.collect().await
     }
 
@@ -248,57 +276,26 @@ impl SimpleFragmentation {
             .create(true)
             .open(filename)
             .unwrap();
-        let mut relations: Vec<Relation> = Vec::new();
+        let mut relations: Vec<Relation> = Vec::with_capacity(self.n_fragments);
         for (i, fragment) in self.fragments.iter().enumerate() {
-            relations.append(&mut self.create_relation(
-                fragment.boundary(),
-                format!("{}.ttl", i + 1),
-                uuid::Uuid::new_v4().to_string(),
-                uuid::Uuid::new_v4().to_string(),
-            ));
+            relations.append(
+                &mut fragment.boundary.to_relation(
+                    &"0.ttl".to_string(),
+                    &fragment
+                        .filename()
+                        .as_path()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    &self.fragmentation_property,
+                    &self.server_address,
+                ),
+            );
         }
         let buffer = Self::relations_to_string(relations);
         file.write_all(buffer.as_bytes()).unwrap();
-    }
-
-    fn create_relation(
-        &self,
-        boundary: &Boundary,
-        fragment_id: String,
-        relation_id_1: String,
-        relation_id_2: String,
-    ) -> Vec<Relation> {
-        let mut resp: Vec<Relation> = Vec::new();
-        let date_time_format = "%Y-%m-%dT%H:%M:%S.%f";
-        if boundary.upper < chrono::NaiveDateTime::MAX.timestamp() {
-            resp.push(Relation::new(
-                self.fragmentation_property.clone(),
-                chrono::NaiveDateTime::from_timestamp_opt(boundary.upper, 0)
-                    .unwrap()
-                    .format(date_time_format)
-                    .to_string(),
-                format!("{}{}", self.server_address, fragment_id),
-                RelationOperator::LessThanRelation,
-                format!("{}0.ttl", self.server_address),
-                relation_id_1,
-            ));
-        }
-
-        if boundary.lower > chrono::NaiveDateTime::MIN.timestamp() {
-            resp.push(Relation::new(
-                self.fragmentation_property.clone(),
-                chrono::NaiveDateTime::from_timestamp_opt(boundary.lower, 0)
-                    .unwrap()
-                    .format(date_time_format)
-                    .to_string(),
-                format!("{}{}", self.server_address, fragment_id),
-                RelationOperator::GreaterThanOrEqualToRelation,
-                format!("{}0.ttl", self.server_address),
-                relation_id_2,
-            ));
-        }
-
-        resp
     }
 
     fn relations_to_string(relations: Vec<Relation>) -> String {
@@ -310,41 +307,16 @@ impl SimpleFragmentation {
         resp
     }
 
-    fn average_n_members(&self) -> f32 {
-        let sum: f32 = self
-            .fragments
-            .iter()
-            .map(move |fragment| fragment.size as f32)
-            .sum();
-
-        sum / self.n_fragments as f32
-    }
-
+    /// It simply delete the fragment with a size of 0, and merge two adjacent fragment
+    /// if the current fragment has 10 times less members than the average.
     async fn rebalance(&mut self) {
-        let avg_n_members = self.average_n_members();
-
-        let shared_fragments = Rc::new(RefCell::new(self.fragments.clone()));
-        for i in 0..self.n_fragments - 2 {
-            if self.fragments[i].size <= 2 * avg_n_members as usize {
-                let current_fragment = &mut shared_fragments.borrow_mut()[i];
-                let next_fragment = &mut shared_fragments.borrow_mut()[i + 1];
-                next_fragment.absorb_lower_fragment(current_fragment).unwrap();
-            }
-        }
-        self.fragments = shared_fragments.take();
-        self.fragments.retain_mut(|fragment| {
-            if fragment.size == 0 {
-                fragment.clear();
-                false
-            } else {
-                true
-            }
-        });
+        self.fragments.retain(|fragment| fragment.size != 0);
+        self.n_fragments = self.fragments.len();
     }
 }
 
 #[async_trait::async_trait]
-impl Fragmentation for SimpleFragmentation {
+impl Fragmentation for OneAryTreeFragmentation {
     async fn insert(&mut self, member: &Member) {
         let mut pos = 0;
         for (i, fragment) in self.fragments.iter().enumerate() {
@@ -363,17 +335,104 @@ impl Fragmentation for SimpleFragmentation {
         self.rebalance().await;
         self.generate_root_node();
 
-        for (i, fragment) in self.fragments.iter().enumerate() {
+        for fragment in self.fragments.iter() {
             println!(
-                "the boundaries of {i} are {} and it has {} members",
+                "the boundaries of {fragment} are {} and it has {} members",
                 fragment.boundary,
                 fragment.len()
             );
         }
     }
+
     fn max_size_cache(&self) -> usize {
         self.max_size_cache
     }
 }
 
-const BIG_FILE_N_MEMBER: usize = 5_000_000;
+pub struct LinkedListFragmentation {
+    one_ary_tree_fragmentation: OneAryTreeFragmentation,
+}
+
+impl LinkedListFragmentation {
+    pub async fn new(
+        n_fragments: usize,
+        max_size_cache: usize,
+        folder: &PathBuf,
+        highest_date: i64,
+        lowest_date: i64,
+        server_address: String,
+        fragmentation_property: String,
+    ) -> Self {
+        let one_ary_tree_fragmentation = OneAryTreeFragmentation::new(
+            n_fragments,
+            max_size_cache,
+            folder,
+            highest_date,
+            lowest_date,
+            server_address,
+            fragmentation_property,
+        )
+        .await;
+
+        Self {
+            one_ary_tree_fragmentation,
+        }
+    }
+
+    async fn add_relation_to_nodes(&self) {
+        for i in 1..self.n_fragments - 1 {
+            let fragment_1 = &self.one_ary_tree_fragmentation.fragments[i];
+            let fragment_2 = &self.one_ary_tree_fragmentation.fragments[i + 1];
+            let relations = fragment_2.boundary().to_relation(
+                &fragment_1
+                    .filename()
+                    .as_path()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                &fragment_2
+                    .filename()
+                    .as_path()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                &self.fragmentation_property,
+                &self.server_address,
+            );
+            let relations = relations.clone();
+            for relation in relations {
+                fragment_1.materialize_relation(&relation).await;
+            }
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl Fragmentation for LinkedListFragmentation {
+    async fn insert(&mut self, member: &Member) {
+        self.one_ary_tree_fragmentation.insert(member).await;
+    }
+
+    async fn finalize(&mut self) {
+        self.one_ary_tree_fragmentation.materialize().await;
+        self.one_ary_tree_fragmentation.rebalance().await;
+        self.add_relation_to_nodes().await;
+    }
+
+    fn max_size_cache(&self) -> usize {
+        self.one_ary_tree_fragmentation.max_size_cache
+    }
+}
+
+impl Deref for LinkedListFragmentation {
+    type Target = OneAryTreeFragmentation;
+
+    fn deref(&self) -> &Self::Target {
+        &self.one_ary_tree_fragmentation
+    }
+}
+const DATE_TIME_FORMAT: &'static str = "%Y-%m-%dT%H:%M:%S.%f";

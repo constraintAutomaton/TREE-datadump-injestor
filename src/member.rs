@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone,PartialEq, Eq, Hash)]
 pub struct Member {
     pub properties: Vec<String>,
     pub date: i64,
