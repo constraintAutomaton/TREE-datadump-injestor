@@ -4,14 +4,11 @@ use async_trait;
 use chrono;
 use futures;
 use futures::stream::StreamExt;
-use std::cell::Cell;
-use std::cell::RefCell;
 use std::fmt;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::rc::Rc;
 use uuid;
 
 #[derive(Clone)]
@@ -290,7 +287,7 @@ impl OneAryTreeFragmentation {
             .open(filename)
             .unwrap();
         let mut relations: Vec<Relation> = Vec::with_capacity(self.n_fragments);
-        for (i, fragment) in self.fragments.iter().enumerate() {
+        for fragment in self.fragments.iter() {
             relations.append(
                 &mut fragment.boundary.to_relation(
                     &"0.ttl".to_string(),
