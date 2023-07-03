@@ -32,7 +32,7 @@ impl OneAryTreeFragmentation {
             let tasks = futures_util::stream::FuturesUnordered::new();
             let mut current_lower_bound = lowest_date;
 
-            let increment = (highest_date - lowest_date) / n_fragments as i64;
+            let increment = ((highest_date as f32 - lowest_date as f32) / n_fragments as f32).ceil() as i64;
             for i in 0..n_fragments {
                 let fragment_path = {
                     let mut resp = folder.clone();
