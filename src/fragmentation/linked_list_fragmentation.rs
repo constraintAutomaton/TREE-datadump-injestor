@@ -6,7 +6,6 @@ use futures;
 use futures::stream::StreamExt;
 use std::fs;
 use std::io::Write;
-use std::ops::Deref;
 use std::path::PathBuf;
 
 pub struct LinkedListFragmentation {
@@ -41,7 +40,7 @@ impl LinkedListFragmentation {
 
     fn generate_root_node(&self) {
         let filename = {
-            let mut resp = self.folder.clone();
+            let mut resp = self.one_ary_tree_fragmentation.folder.clone();
             resp.push(format!("0.ttl"));
             resp
         };
@@ -52,11 +51,11 @@ impl LinkedListFragmentation {
             .create(true)
             .open(filename)
             .unwrap();
-        let relation = self.fragments[0].boundary().to_relation(
+        let relation = self.one_ary_tree_fragmentation.fragments[0].boundary().to_relation(
             &"0.ttl".to_string(),
             &"1.ttl".to_string(),
-            &self.fragmentation_property,
-            &self.server_address,
+            &self.one_ary_tree_fragmentation.fragmentation_property,
+            &self.one_ary_tree_fragmentation.server_address,
         );
         let buffer = OneAryTreeFragmentation::relations_to_string(relation);
         file.write_all(buffer.as_bytes()).unwrap();
@@ -64,7 +63,7 @@ impl LinkedListFragmentation {
 
     async fn add_relation_to_nodes(&self) {
         let tasks = futures_util::stream::FuturesUnordered::new();
-        for i in 0..self.n_fragments - 1 {
+        for i in 0..self.one_ary_tree_fragmentation.n_fragments - 1 {
             let fragment_1 = &self.one_ary_tree_fragmentation.fragments[i];
             let fragment_2 = &self.one_ary_tree_fragmentation.fragments[i + 1];
             let relations = fragment_2.boundary().to_relation(
@@ -84,8 +83,8 @@ impl LinkedListFragmentation {
                     .to_str()
                     .unwrap()
                     .to_string(),
-                &self.fragmentation_property,
-                &self.server_address,
+                &self.one_ary_tree_fragmentation.fragmentation_property,
+                &self.one_ary_tree_fragmentation.server_address,
             );
             tasks.push(fragment_1.materialize_relation(relations));
         }
@@ -111,17 +110,8 @@ impl super::Fragmentation for LinkedListFragmentation {
         self.one_ary_tree_fragmentation.max_size_cache
     }
 
-    /// I don't know how to not implement this method since the trait force me to do it.
-    #[allow(implied_bounds_entailment)]
     fn fragments(&self) -> &Vec<Fragment> {
-        &self.fragments
+        &self.one_ary_tree_fragmentation.fragments
     }
 }
 
-impl Deref for LinkedListFragmentation {
-    type Target = OneAryTreeFragmentation;
-
-    fn deref(&self) -> &Self::Target {
-        &self.one_ary_tree_fragmentation
-    }
-}
