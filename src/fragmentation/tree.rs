@@ -9,6 +9,7 @@ pub struct Tree {
     fragments: Vec<Fragment>,
     max_size_cache: usize,
     random_generator: rand::rngs::StdRng,
+    folder: PathBuf,
 }
 
 impl Tree {
@@ -78,11 +79,12 @@ impl Tree {
             }
             resp
         };
-
+        super::create_report(&fragments, &folder);
         Self {
             fragments,
             max_size_cache,
             random_generator: rand::rngs::StdRng::from_entropy(),
+            folder: folder.clone(),
         }
     }
 
@@ -114,6 +116,7 @@ impl super::Fragmentation for Tree {
     async fn finalize(&mut self) {
         self.materialize().await;
         self.print_summary();
+        super::create_report(&self.fragments, &self.folder);
     }
     fn max_size_cache(&self) -> usize {
         self.max_size_cache

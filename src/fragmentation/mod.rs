@@ -1,14 +1,18 @@
 pub mod fragment;
 pub mod linked_list_fragmentation;
 pub mod one_ary_tree_fragmentation;
+mod report;
 pub mod tree;
 
 use self::fragment::*;
 use self::linked_list_fragmentation::LinkedListFragmentation;
 use self::one_ary_tree_fragmentation::OneAryTreeFragmentation;
+use self::report::Report;
 use self::tree::Tree;
 use crate::member::Member;
 use crate::tree::*;
+use serde_json;
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -86,6 +90,29 @@ pub(super) fn generate_central_root_node(
     file.write_all(buffer.as_bytes()).unwrap();
 }
 
+pub(super) fn create_report(fragments: &Vec<Fragment>, folder: &PathBuf) {
+    let mut map_report = HashMap::new();
+    for fragment in fragments.iter() {
+        let report = Report {
+            n_member: if fragment.size() == 0 {
+                None
+            } else {
+                Some(fragment.size())
+            },
+            boundary: fragment.boundary().clone(),
+        };
+        map_report.insert(fragment.filename().clone(), report);
+        let json_string = serde_json::to_string(&map_report).expect("unable to produce the report");
+
+        let report_path = {
+            let mut resp = folder.clone();
+            resp.push("report.json");
+            resp
+        };
+
+        fs::write(report_path, json_string).expect("unable to generate the report file");
+    }
+}
 #[derive(Clone, Debug)]
 pub enum FragmentationTypeName {
     OneAryTree,

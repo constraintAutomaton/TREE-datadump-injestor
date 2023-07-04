@@ -57,9 +57,6 @@ impl OneAryTreeFragmentation {
             let resp: Vec<Fragment> = tasks.collect().await;
             resp
         };
-        for (i, fragment) in fragments.iter().enumerate() {
-            println!("the boundaries of {i} are {}", fragment.boundary(),);
-        }
 
         super::generate_central_root_node(
             &folder,
@@ -68,6 +65,8 @@ impl OneAryTreeFragmentation {
             &fragmentation_property,
             &server_address,
         );
+
+        super::create_report(&fragments, &folder);
 
         Self {
             fragments,
@@ -122,6 +121,7 @@ impl super::Fragmentation for OneAryTreeFragmentation {
         self.materialize().await;
         self.rebalance().await;
         self.print_summary();
+        super::create_report(&self.fragments, &self.folder);
     }
 
     fn fragments(&self) -> &Vec<Fragment> {

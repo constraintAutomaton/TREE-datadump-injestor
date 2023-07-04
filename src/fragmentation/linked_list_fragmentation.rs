@@ -106,6 +106,10 @@ impl super::Fragmentation for LinkedListFragmentation {
         self.generate_root_node();
         self.add_relation_to_nodes().await;
         self.print_summary();
+        super::create_report(
+            &self.one_ary_tree_fragmentation.fragments,
+            &self.one_ary_tree_fragmentation.folder,
+        );
     }
 
     fn max_size_cache(&self) -> usize {

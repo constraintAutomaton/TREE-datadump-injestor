@@ -1,6 +1,7 @@
 use crate::member::Member;
 use crate::tree::*;
 use chrono;
+use serde;
 use std::fmt;
 use std::fs;
 use std::io::Write;
@@ -177,7 +178,7 @@ impl fmt::Display for Fragment {
         write!(f, "{}", self.filename.as_os_str().to_str().unwrap())
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Boundary {
     pub upper: i64,
     pub lower: i64,
