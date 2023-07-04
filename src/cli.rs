@@ -13,6 +13,10 @@ pub(crate) struct Cli {
     #[arg(short, long, default_value_t = 1_000)]
     pub n_fragments: usize,
 
+    /// The dept of the fragmentation [default: None]
+    #[arg(short, long)]
+    pub dept: Option<usize>,
+
     /// Path of the configuration file
     /// By default the value is [default: ./config.json]
     #[arg(short, long)]
@@ -32,7 +36,7 @@ pub(crate) struct Cli {
     #[arg(short, long,default_value_t=false, action = clap::ArgAction::SetTrue)]
     pub large_file: bool,
 
-    /// The the type of fragmentation can be either "linkedList" or "oneAryTree" [default: "oneAryTree"]
+    /// The the type of fragmentation can be either "linkedList", "oneAryTree" or "tree" [default: "oneAryTree"]
     #[arg(short, long)]
     pub fragmentation: Option<String>,
 }

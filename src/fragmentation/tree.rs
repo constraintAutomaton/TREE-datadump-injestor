@@ -1,21 +1,17 @@
-use super::fragment::*;
+use super::Fragment;
 use crate::member::Member;
-use async_trait;
-use chrono;
 use futures;
 use futures::stream::StreamExt;
+use rand::{self, Rng, SeedableRng};
 use std::path::PathBuf;
 
-pub struct OneAryTreeFragmentation {
-    pub(super) fragments: Vec<Fragment>,
-    pub(super) n_fragments: usize,
-    pub(super) max_size_cache: usize,
-    pub(super) folder: PathBuf,
-    pub(super) server_address: String,
-    pub(super) fragmentation_property: String,
+pub struct Tree {
+    fragments: Vec<Fragment>,
+    max_size_cache: usize,
+    random_generator: rand::rngs::StdRng,
 }
 
-impl OneAryTreeFragmentation {
+impl Tree {
     pub async fn new(
         n_fragments: usize,
         max_size_cache: usize,
@@ -24,9 +20,10 @@ impl OneAryTreeFragmentation {
         lowest_date: i64,
         server_address: String,
         fragmentation_property: String,
+        dept: usize,
     ) -> Self {
         let fragments = {
-            let tasks = futures_util::stream::FuturesUnordered::new();
+            let tasks_create_first_row = futures_util::stream::FuturesUnordered::new();
             let mut current_lower_bound = lowest_date;
 
             let increment =
@@ -38,62 +35,58 @@ impl OneAryTreeFragmentation {
                     resp
                 };
 
-                tasks.push(Fragment::new(
+                tasks_create_first_row.push(Fragment::new(
                     fragment_path,
                     max_size_cache,
                     if i == 0 {
-                        chrono::NaiveDateTime::MIN.timestamp()
+                        current_lower_bound - increment
                     } else {
                         current_lower_bound
                     },
                     if i == n_fragments - 1 {
-                        chrono::NaiveDateTime::MAX.timestamp()
+                        current_lower_bound + 2 * increment
                     } else {
                         current_lower_bound + increment
                     },
                 ));
                 current_lower_bound += increment;
             }
-            let resp: Vec<Fragment> = tasks.collect().await;
+            let mut resp: Vec<Fragment> = tasks_create_first_row.collect().await;
+            super::generate_central_root_node(
+                folder,
+                n_fragments,
+                &resp,
+                &fragmentation_property,
+                &server_address,
+            );
+            let mut fragment_to_divide = resp.clone();
+
+            for i in 0..dept {
+                let mut current_fragment = fragment_to_divide.pop();
+                let mut next_fragments_to_divide = Vec::with_capacity(n_fragments * (i + 1));
+                while let Some(fragment) = current_fragment.as_mut() {
+                    let (fragment_1, fragment_2) = fragment
+                        .create_two_sub_fragment(&fragmentation_property, &server_address)
+                        .await;
+                    next_fragments_to_divide.push(fragment_1.clone());
+                    next_fragments_to_divide.push(fragment_2.clone());
+                    resp.push(fragment_1.clone());
+                    resp.push(fragment_2.clone());
+                    current_fragment = fragment_to_divide.pop();
+                }
+                fragment_to_divide.append(&mut next_fragments_to_divide);
+            }
             resp
         };
-        for (i, fragment) in fragments.iter().enumerate() {
-            println!("the boundaries of {i} are {}", fragment.boundary(),);
-        }
-
-        super::generate_central_root_node(
-            &folder,
-            n_fragments,
-            &fragments,
-            &fragmentation_property,
-            &server_address,
-        );
 
         Self {
             fragments,
-            n_fragments,
             max_size_cache,
-            folder: folder.clone(),
-            server_address,
-            fragmentation_property,
+            random_generator: rand::rngs::StdRng::from_entropy(),
         }
     }
 
-    /// It simply delete the fragment with a size of 0, and merge two adjacent fragment
-    /// if the current fragment has 10 times less members than the average.
-    pub(super) async fn rebalance(&mut self) {
-        self.fragments.retain(|fragment| {
-            if fragment.size() == 0 {
-                fragment.clear_file();
-                false
-            } else {
-                true
-            }
-        });
-        self.n_fragments = self.fragments.len();
-    }
-
-    pub(super) async fn materialize(&mut self) {
+    async fn materialize(&mut self) {
         let materialize_tasks = futures_util::stream::FuturesUnordered::new();
         for fragment in self.fragments.iter_mut() {
             materialize_tasks.push(fragment.materialize());
@@ -104,15 +97,15 @@ impl OneAryTreeFragmentation {
 }
 
 #[async_trait::async_trait]
-impl super::Fragmentation for OneAryTreeFragmentation {
+impl super::Fragmentation for Tree {
     async fn insert(&mut self, member: &Member) {
-        let mut pos = 0;
+        let mut pos_candidate = Vec::new();
         for (i, fragment) in self.fragments.iter().enumerate() {
             if fragment.boundary().is_in_between(member.date) {
-                pos = i;
-                break;
+                pos_candidate.push(i);
             }
         }
+        let pos = pos_candidate[self.random_generator.gen_range(0..pos_candidate.len())];
         if let Err(_) = self.fragments[pos].insert(&member) {
             self.materialize().await;
             self.fragments[pos].insert(&member).unwrap();
@@ -120,15 +113,12 @@ impl super::Fragmentation for OneAryTreeFragmentation {
     }
     async fn finalize(&mut self) {
         self.materialize().await;
-        self.rebalance().await;
         self.print_summary();
     }
-
-    fn fragments(&self) -> &Vec<Fragment> {
-        &self.fragments
-    }
-
     fn max_size_cache(&self) -> usize {
         self.max_size_cache
+    }
+    fn fragments(&self) -> &Vec<Fragment> {
+        &self.fragments
     }
 }

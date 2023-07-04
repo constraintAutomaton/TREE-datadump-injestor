@@ -51,13 +51,15 @@ impl LinkedListFragmentation {
             .create(true)
             .open(filename)
             .unwrap();
-        let relation = self.one_ary_tree_fragmentation.fragments[0].boundary().to_relation(
-            &"0.ttl".to_string(),
-            &"1.ttl".to_string(),
-            &self.one_ary_tree_fragmentation.fragmentation_property,
-            &self.one_ary_tree_fragmentation.server_address,
-        );
-        let buffer = OneAryTreeFragmentation::relations_to_string(relation);
+        let relation = self.one_ary_tree_fragmentation.fragments[0]
+            .boundary()
+            .to_relation(
+                &"0.ttl".to_string(),
+                &"1.ttl".to_string(),
+                &self.one_ary_tree_fragmentation.fragmentation_property,
+                &self.one_ary_tree_fragmentation.server_address,
+            );
+        let buffer = super::relations_to_string(relation);
         file.write_all(buffer.as_bytes()).unwrap();
     }
 
@@ -114,4 +116,3 @@ impl super::Fragmentation for LinkedListFragmentation {
         &self.one_ary_tree_fragmentation.fragments
     }
 }
-

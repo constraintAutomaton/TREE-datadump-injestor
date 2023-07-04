@@ -91,6 +91,85 @@ impl Fragment {
         self.members_to_materialized.push(member.clone());
         Ok(())
     }
+
+    pub async fn create_two_sub_fragment(
+        &mut self,
+        fragmentation_property: &String,
+        server_address: &String,
+    ) -> (Fragment, Fragment) {
+        self.materialize().await;
+
+        let mid_bound = self.boundary.lower + (self.boundary.upper - self.boundary.lower) / 2;
+        let generate_filename = || {
+            let mut resp = self.filename.clone();
+            resp.pop();
+            resp.push(format!("{}.ttl", uuid::Uuid::new_v4().to_string()));
+            resp
+        };
+
+        let fragment_1 = Fragment::new(
+            generate_filename(),
+            self.max_size_cache,
+            self.boundary.lower,
+            mid_bound,
+        )
+        .await;
+
+        let fragment_2 = Fragment::new(
+            generate_filename(),
+            self.max_size_cache,
+            mid_bound,
+            self.boundary.upper,
+        )
+        .await;
+
+        let relations_1 = fragment_1.boundary.to_relation(
+            &self
+                .filename()
+                .as_path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            &fragment_1
+                .filename()
+                .as_path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            fragmentation_property,
+            server_address,
+        );
+
+        let relations_2 = fragment_2.boundary.to_relation(
+            &self
+                .filename()
+                .as_path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            &fragment_2
+                .filename()
+                .as_path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            fragmentation_property,
+            server_address,
+        );
+
+        self.materialize_relation(relations_1).await;
+        self.materialize_relation(relations_2).await;
+
+        (fragment_1, fragment_2)
+    }
 }
 
 impl fmt::Display for Fragment {

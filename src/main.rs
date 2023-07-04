@@ -8,6 +8,7 @@ mod tree;
 use clap::Parser;
 use cli::*;
 use config::*;
+use fragmentation::FragmentationTypeName;
 use futures;
 use futures::stream::StreamExt;
 use glob;
@@ -16,7 +17,6 @@ use parse_datadump::*;
 use std::path::PathBuf;
 use std::time;
 use tokio;
-use fragmentation::FragmentationTypeName;
 
 #[tokio::main]
 async fn main() {
@@ -29,6 +29,13 @@ async fn main() {
     if n_fragments < 2 {
         panic!("The should be at least 2 fragments")
     }
+    let dept = cli.dept;
+    if let Some(dept) = dept {
+        if dept <= 0 {
+            panic!("the dept should be at least of 1")
+        }
+    }
+
     let max_cache_element: usize = if data_injection_config.n_members / (n_fragments * 20) != 0usize
     {
         data_injection_config.n_members / (n_fragments * 20)
@@ -42,9 +49,9 @@ async fn main() {
         "../comunica_filter_benchmark/evaluation/data/dahcc_1_participant/data.ttl",
     ));
     let large_file = cli.large_file;
-    let fragmentation_type = if let Some(frag) =cli.fragmentation{
+    let fragmentation_type = if let Some(frag) = cli.fragmentation {
         FragmentationTypeName::from(frag)
-    }else{
+    } else {
         FragmentationTypeName::OneAryTree
     };
 
@@ -56,7 +63,8 @@ async fn main() {
         max_cache_element,
         n_fragments,
         out_path,
-        fragmentation_type
+        fragmentation_type,
+        dept
     )
     .unwrap();
     let duration = start.elapsed();
