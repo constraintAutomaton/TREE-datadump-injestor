@@ -61,7 +61,9 @@ pub fn parse_datadump(
         }
 
         // we add the triple as a property of the member
-        current_member.properties.push(t.to_string());
+        current_member
+            .properties
+            .push(format!("{} .", t.to_string()));
 
         // we add the date into a specific field because it is the bases of the fragmentation
         if t.predicate
