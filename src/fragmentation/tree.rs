@@ -14,7 +14,7 @@ pub struct Tree {
 
 impl Tree {
     pub async fn new(
-        n_fragments: usize,
+        n_fragments_first_row: usize,
         max_size_cache: usize,
         folder: &PathBuf,
         highest_date: i64,
@@ -28,8 +28,8 @@ impl Tree {
             let mut current_lower_bound = lowest_date;
 
             let increment =
-                ((highest_date as f32 - lowest_date as f32) / n_fragments as f32).ceil() as i64;
-            for i in 0..n_fragments {
+                ((highest_date as f32 - lowest_date as f32) / n_fragments_first_row as f32).ceil() as i64;
+            for i in 0..n_fragments_first_row {
                 let fragment_path = {
                     let mut resp = folder.clone();
                     resp.push(format!("{}.ttl", i + 1));
@@ -44,7 +44,7 @@ impl Tree {
                     } else {
                         current_lower_bound
                     },
-                    if i == n_fragments - 1 {
+                    if i == n_fragments_first_row - 1 {
                         current_lower_bound + 2 * increment
                     } else {
                         current_lower_bound + increment
@@ -55,7 +55,7 @@ impl Tree {
             let mut resp: Vec<Fragment> = tasks_create_first_row.collect().await;
             super::generate_central_root_node(
                 folder,
-                n_fragments,
+                n_fragments_first_row,
                 &resp,
                 &fragmentation_property,
                 &server_address,
@@ -64,7 +64,7 @@ impl Tree {
 
             for i in 0..dept {
                 let mut current_fragment = fragment_to_divide.pop();
-                let mut next_fragments_to_divide = Vec::with_capacity(n_fragments * (i + 1));
+                let mut next_fragments_to_divide = Vec::with_capacity(n_fragments_first_row * (i + 1));
                 while let Some(fragment) = current_fragment.as_mut() {
                     let (fragment_1, fragment_2) = fragment
                         .create_two_sub_fragment(&fragmentation_property, &server_address)

@@ -136,7 +136,7 @@ impl From<String> for FragmentationTypeName {
 
 pub async fn factory(
     fragmentation_type: FragmentationTypeName,
-    n_fragments: usize,
+    n_fragments_first_row: usize,
     max_size_cache: usize,
     folder: &PathBuf,
     highest_date: i64,
@@ -148,7 +148,7 @@ pub async fn factory(
     match fragmentation_type {
         FragmentationTypeName::LinkedList => Box::new(
             LinkedListFragmentation::new(
-                n_fragments,
+                n_fragments_first_row,
                 max_size_cache,
                 &folder,
                 highest_date,
@@ -160,7 +160,7 @@ pub async fn factory(
         ),
         FragmentationTypeName::OneAryTree => Box::new(
             OneAryTreeFragmentation::new(
-                n_fragments,
+                n_fragments_first_row,
                 max_size_cache,
                 &folder,
                 highest_date,
@@ -172,7 +172,7 @@ pub async fn factory(
         ),
         FragmentationTypeName::Tree => Box::new(
             Tree::new(
-                n_fragments,
+                n_fragments_first_row,
                 max_size_cache,
                 &folder,
                 highest_date,

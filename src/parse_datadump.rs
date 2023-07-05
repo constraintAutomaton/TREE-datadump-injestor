@@ -21,7 +21,7 @@ pub fn parse_datadump(
     notice_frequency: usize,
     large_file: bool,
     max_cache_element: usize,
-    n_fragments: usize,
+    n_fragments_first_row: usize,
     out_path: PathBuf,
     fragmentation_type: FragmentationTypeName,
     dept: Option<usize>,
@@ -128,7 +128,7 @@ pub fn parse_datadump(
         handle.block_on(async {
             let mut fragmentation = factory(
                 fragmentation_type,
-                n_fragments,
+                n_fragments_first_row,
                 max_cache_element,
                 &out_path,
                 highest_date,

@@ -11,10 +11,10 @@ pub(crate) struct Cli {
 
     /// The number of fragment of the outputed TREE document
     #[arg(short, long, default_value_t = 1_000)]
-    pub n_fragments: usize,
+    pub n_fragment_first_row: usize,
 
     /// The dept of the fragmentation [default: None]
-    #[arg(short, long)]
+    #[arg(long)]
     pub dept: Option<usize>,
 
     /// Path of the configuration file
