@@ -1,12 +1,14 @@
 use super::fragment::*;
 use super::one_ary_tree_fragmentation::*;
 use crate::member::Member;
+use crate::tree::Relation;
 use async_trait;
 use futures;
 use futures::stream::StreamExt;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use uuid;
 
 pub struct LinkedListFragmentation {
     one_ary_tree_fragmentation: OneAryTreeFragmentation,
@@ -51,18 +53,20 @@ impl LinkedListFragmentation {
             .create(true)
             .open(filename)
             .unwrap();
-        let relation = self.one_ary_tree_fragmentation.fragments[0]
-            .boundary()
-            .to_relation(
-                &"0.ttl".to_string(),
-                &"1.ttl".to_string(),
-                &self.one_ary_tree_fragmentation.fragmentation_property,
-                &self.one_ary_tree_fragmentation.server_address,
-            );
-        let buffer = super::relations_to_string(relation);
+        let relation = Relation::new_unconstraint(
+            format!("{}1.ttl", self.one_ary_tree_fragmentation.server_address),
+            format!("{}0.ttl", self.one_ary_tree_fragmentation.server_address),
+            uuid::Uuid::new_v4().to_string(),
+        );
+
+        let buffer = super::relations_to_string(vec![relation]);
         file.write_all(buffer.as_bytes()).unwrap();
     }
-
+    fn set_up_boundary_to_infinity(&mut self) {
+        for fragment in self.one_ary_tree_fragmentation.fragments.iter_mut() {
+            fragment.up_boundary_infinity();
+        }
+    }
     async fn add_relation_to_nodes(&self) {
         let tasks = futures_util::stream::FuturesUnordered::new();
         for i in 0..self.one_ary_tree_fragmentation.n_fragments - 1 {
@@ -101,6 +105,7 @@ impl super::Fragmentation for LinkedListFragmentation {
     }
 
     async fn finalize(&mut self) {
+        self.set_up_boundary_to_infinity();
         self.one_ary_tree_fragmentation.materialize().await;
         self.one_ary_tree_fragmentation.rebalance().await;
         self.generate_root_node();

@@ -41,6 +41,10 @@ impl Fragment {
         &self.boundary
     }
 
+    pub fn up_boundary_infinity(&mut self) {
+        self.boundary.upper = chrono::NaiveDateTime::MAX.timestamp();
+    }
+
     pub fn size(&self) -> usize {
         self.size
     }
@@ -240,13 +244,15 @@ impl Boundary {
         relation_type: RelationOperator,
     ) -> Relation {
         Relation::new(
-            fragmentation_property.clone(),
-            chrono::NaiveDateTime::from_timestamp_opt(time_value, 0)
-                .unwrap()
-                .format(DATE_TIME_FORMAT)
-                .to_string(),
+            Some(fragmentation_property.clone()),
+            Some(
+                chrono::NaiveDateTime::from_timestamp_opt(time_value, 0)
+                    .unwrap()
+                    .format(DATE_TIME_FORMAT)
+                    .to_string(),
+            ),
             format!("{server_address}{destination_id}"),
-            relation_type,
+            Some(relation_type),
             format!("{server_address}{current_id}"),
             uuid::Uuid::new_v4().to_string(),
         )

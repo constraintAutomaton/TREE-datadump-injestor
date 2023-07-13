@@ -63,25 +63,36 @@ impl fmt::Display for RelationOperator {
 /// Represents a relationship between the members across two nodes.
 pub struct Relation {
     /// A property path, as defined by SHACL, that indicates what resource the tree:value affects.
-    path: String,
+    path: Option<String>,
     /// The contextual value of this node.
-    value: String,
+    value: Option<String>,
     /// Link to the TREE node document for this relationship.
     node: String,
     /// The type of the relationship.
-    relation_type: RelationOperator,
+    relation_type: Option<RelationOperator>,
     /// The Node containing the relation
     current_node_iri: String,
     /// the id of the blank node
     relation_id: String,
 }
 
+impl Relation {
+    pub fn new_unconstraint(node: String, current_node_iri: String, relation_id: String) -> Self {
+        Self {
+            path: None,
+            value: None,
+            node,
+            current_node_iri,
+            relation_type: None,
+            relation_id,
+        }
+    }
+}
+
 impl fmt::Display for Relation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut resp = String::new();
-        let relation_comparator = self.relation_type.to_string();
-
-        let triples = [
+        let mut triples = vec![
             rio_api::model::Triple {
                 subject: rio_api::model::NamedNode {
                     iri: &self.current_node_iri,
@@ -100,23 +111,38 @@ impl fmt::Display for Relation {
                     id: &self.relation_id,
                 }
                 .into(),
-                predicate: rio_api::model::NamedNode { iri: TYPE_VOCAB },
-                object: rio_api::model::NamedNode {
-                    iri: &relation_comparator,
-                }
-                .into(),
-            },
-            rio_api::model::Triple {
-                subject: rio_api::model::BlankNode {
-                    id: &self.relation_id,
-                }
-                .into(),
                 predicate: rio_api::model::NamedNode {
                     iri: TREE_NODE_VOCAB,
                 },
                 object: rio_api::model::NamedNode { iri: &self.node }.into(),
             },
-            rio_api::model::Triple {
+        ];
+        let relation_comparator = self
+            .relation_type
+            .as_ref()
+            .and_then(|v| Some(v.to_string()))
+            .unwrap_or_default();
+        if !relation_comparator.is_empty() {
+            triples.push(rio_api::model::Triple {
+                subject: rio_api::model::BlankNode {
+                    id: &self.relation_id,
+                }
+                .into(),
+                predicate: rio_api::model::NamedNode { iri: TYPE_VOCAB },
+                object: rio_api::model::NamedNode {
+                    iri: &relation_comparator,
+                }
+                .into(),
+            })
+        }
+
+        let value = self
+            .value
+            .as_ref()
+            .and_then(|v| Some(v.to_string()))
+            .unwrap_or_default();
+        if !value.is_empty() {
+            triples.push(rio_api::model::Triple {
                 subject: rio_api::model::BlankNode {
                     id: &self.relation_id,
                 }
@@ -125,14 +151,23 @@ impl fmt::Display for Relation {
                     iri: TREE_VALUE_VOCAB,
                 },
                 object: rio_api::model::Literal::Typed {
-                    value: &self.value,
+                    value: &value,
                     datatype: rio_api::model::NamedNode {
                         iri: DATA_TIME_VOCAB,
                     },
                 }
                 .into(),
-            },
-            rio_api::model::Triple {
+            });
+        }
+
+        let path = self
+            .path
+            .as_ref()
+            .and_then(|v| Some(v.to_string()))
+            .unwrap_or_default();
+
+        if !path.is_empty() {
+            triples.push(rio_api::model::Triple {
                 subject: rio_api::model::BlankNode {
                     id: &self.relation_id,
                 }
@@ -140,13 +175,13 @@ impl fmt::Display for Relation {
                 predicate: rio_api::model::NamedNode {
                     iri: TREE_PATH_VOCAB,
                 },
-                object: rio_api::model::NamedNode { iri: &self.path }.into(),
-            },
-        ];
+                object: rio_api::model::NamedNode { iri: &path }.into(),
+            });
+        }
 
         for triple in triples {
             resp.push_str(&triple.to_string());
-            resp.push_str(".\n");
+            resp.push_str(" .\n");
         }
 
         write!(f, "{}", resp)
