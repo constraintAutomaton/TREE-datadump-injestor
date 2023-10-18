@@ -39,4 +39,7 @@ pub(crate) struct Cli {
     /// The the type of fragmentation can be either "linkedList", "oneAryTree" or "tree" [default: "oneAryTree"]
     #[arg(short, long)]
     pub fragmentation: Option<String>,
+
+    #[arg(short, long, default_value_t = String::from("http://myTree.org/tree#"))]
+    pub tree_id: String,
 }

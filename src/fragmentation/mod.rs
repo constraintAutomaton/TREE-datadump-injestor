@@ -144,6 +144,7 @@ pub async fn factory(
     server_address: String,
     fragmentation_property: String,
     dept: Option<usize>,
+    tree_id: String,
 ) -> Box<dyn Fragmentation> {
     match fragmentation_type {
         FragmentationTypeName::LinkedList => Box::new(
@@ -155,6 +156,7 @@ pub async fn factory(
                 lowest_date,
                 server_address,
                 fragmentation_property,
+                tree_id,
             )
             .await,
         ),
@@ -167,6 +169,7 @@ pub async fn factory(
                 lowest_date,
                 server_address,
                 fragmentation_property,
+                tree_id,
             )
             .await,
         ),
@@ -180,6 +183,7 @@ pub async fn factory(
                 server_address,
                 fragmentation_property,
                 dept.expect("the dept should be defined to create a tree"),
+                tree_id,
             )
             .await,
         ),

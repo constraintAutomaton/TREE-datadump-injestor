@@ -62,7 +62,7 @@ impl Fragment {
             file.write_all(buffer.as_bytes()).unwrap();
         }
     }
-    pub async fn materialize(&mut self) {
+    pub async fn materialize(&mut self, tree_id: &str) {
         if self.members_to_materialized.len() > 0 {
             let mut file = fs::OpenOptions::new()
                 .append(true)
@@ -71,7 +71,11 @@ impl Fragment {
             let buffer = {
                 let mut resp = String::new();
                 for member in self.members_to_materialized.iter() {
-                    resp.push_str(&member.to_string())
+                    resp.push_str(&member.to_string());
+                    resp.push_str(&format!(
+                        "<{}> <https://w3id.org/tree#member> <{}>.",
+                        tree_id, member.id
+                    ));
                 }
                 resp
             };
@@ -101,8 +105,9 @@ impl Fragment {
         &mut self,
         fragmentation_property: &String,
         server_address: &String,
+        ldes_id: &str,
     ) -> (Fragment, Fragment) {
-        self.materialize().await;
+        self.materialize(ldes_id).await;
 
         let mid_bound = self.boundary.lower + (self.boundary.upper - self.boundary.lower) / 2;
         let generate_filename = || {

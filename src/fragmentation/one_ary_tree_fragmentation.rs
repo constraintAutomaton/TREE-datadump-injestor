@@ -13,6 +13,7 @@ pub struct OneAryTreeFragmentation {
     pub(super) folder: PathBuf,
     pub(super) server_address: String,
     pub(super) fragmentation_property: String,
+    tree_id: String,
 }
 
 impl OneAryTreeFragmentation {
@@ -24,6 +25,7 @@ impl OneAryTreeFragmentation {
         lowest_date: i64,
         server_address: String,
         fragmentation_property: String,
+        tree_id: String,
     ) -> Self {
         let fragments = {
             let tasks = futures_util::stream::FuturesUnordered::new();
@@ -75,6 +77,7 @@ impl OneAryTreeFragmentation {
             folder: folder.clone(),
             server_address,
             fragmentation_property,
+            tree_id,
         }
     }
 
@@ -95,7 +98,7 @@ impl OneAryTreeFragmentation {
     pub(super) async fn materialize(&mut self) {
         let materialize_tasks = futures_util::stream::FuturesUnordered::new();
         for fragment in self.fragments.iter_mut() {
-            materialize_tasks.push(fragment.materialize());
+            materialize_tasks.push(fragment.materialize(&self.tree_id));
         }
 
         let _: Vec<_> = materialize_tasks.collect().await;
