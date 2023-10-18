@@ -23,6 +23,7 @@ impl LinkedListFragmentation {
         lowest_date: i64,
         server_address: String,
         fragmentation_property: String,
+        tree_id: String,
     ) -> Self {
         let one_ary_tree_fragmentation = OneAryTreeFragmentation::new(
             n_fragments,
@@ -32,6 +33,7 @@ impl LinkedListFragmentation {
             lowest_date,
             server_address,
             fragmentation_property,
+            tree_id,
         )
         .await;
 

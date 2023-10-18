@@ -1,8 +1,8 @@
 {
-    "member_url_regex": "https://dahcc.idlab.ugent.be/Protego/_participant31/obs([0-9]*)",
+    "member_url_regex": "https://dahcc.idlab.ugent.be/Protego/_participant19/obs([0-9]*)",
     "n_members": 559992,
-    "lowest_date": "2022-01-03T09:44:14.000000",
-    "highest_date": "2022-01-03T19:54:52.228000",
+    "lowest_date": "2022-01-01T10:29:19.486000",
+    "highest_date": "2022-01-05T10:29:19.486000",
     "server_address": "http://localhost:8080/",
     "date_field": "https://saref.etsi.org/core/hasTimestamp",
     "schema": [

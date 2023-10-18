@@ -10,6 +10,7 @@ pub struct Tree {
     max_size_cache: usize,
     random_generator: rand::rngs::StdRng,
     folder: PathBuf,
+    tree_id: String,
 }
 
 impl Tree {
@@ -22,13 +23,15 @@ impl Tree {
         server_address: String,
         fragmentation_property: String,
         dept: usize,
+        tree_id: String,
     ) -> Self {
         let fragments = {
             let tasks_create_first_row = futures_util::stream::FuturesUnordered::new();
             let mut current_lower_bound = lowest_date;
 
-            let increment =
-                ((highest_date as f32 - lowest_date as f32) / n_fragments_first_row as f32).ceil() as i64;
+            let increment = ((highest_date as f32 - lowest_date as f32)
+                / n_fragments_first_row as f32)
+                .ceil() as i64;
             for i in 0..n_fragments_first_row {
                 let fragment_path = {
                     let mut resp = folder.clone();
@@ -64,10 +67,11 @@ impl Tree {
 
             for i in 0..dept {
                 let mut current_fragment = fragment_to_divide.pop();
-                let mut next_fragments_to_divide = Vec::with_capacity(n_fragments_first_row * (i + 1));
+                let mut next_fragments_to_divide =
+                    Vec::with_capacity(n_fragments_first_row * (i + 1));
                 while let Some(fragment) = current_fragment.as_mut() {
                     let (fragment_1, fragment_2) = fragment
-                        .create_two_sub_fragment(&fragmentation_property, &server_address)
+                        .create_two_sub_fragment(&fragmentation_property, &server_address, &tree_id)
                         .await;
                     next_fragments_to_divide.push(fragment_1.clone());
                     next_fragments_to_divide.push(fragment_2.clone());
@@ -85,13 +89,14 @@ impl Tree {
             max_size_cache,
             random_generator: rand::rngs::StdRng::from_entropy(),
             folder: folder.clone(),
+            tree_id,
         }
     }
 
     async fn materialize(&mut self) {
         let materialize_tasks = futures_util::stream::FuturesUnordered::new();
         for fragment in self.fragments.iter_mut() {
-            materialize_tasks.push(fragment.materialize());
+            materialize_tasks.push(fragment.materialize(&self.tree_id));
         }
 
         let _: Vec<_> = materialize_tasks.collect().await;

@@ -25,6 +25,7 @@ pub fn parse_datadump(
     out_path: PathBuf,
     fragmentation_type: FragmentationTypeName,
     dept: Option<usize>,
+    tree_id: String,
 ) -> Result<(), Box<dyn Error>> {
     let file = File::open(data_dump_path.clone())?;
     let mut current_member = Member::default();
@@ -138,6 +139,7 @@ pub fn parse_datadump(
                 server_address,
                 date_field,
                 dept,
+                tree_id,
             )
             .await;
             let mut member_queue: VecDeque<Member> =

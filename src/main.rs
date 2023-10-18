@@ -14,12 +14,13 @@ use futures::stream::StreamExt;
 use glob;
 use humantime::format_duration;
 use parse_datadump::*;
+use std::error::Error;
 use std::path::PathBuf;
 use std::time;
 use tokio;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
     let start = time::Instant::now();
     let cli = Cli::parse();
     let config_path = cli.config_path.unwrap_or(PathBuf::from("./config.json"));
@@ -36,12 +37,12 @@ async fn main() {
         }
     }
 
-    let max_cache_element: usize = if data_injection_config.n_members / (n_fragments_first_row * 20) != 0usize
-    {
-        data_injection_config.n_members / (n_fragments_first_row * 20)
-    } else {
-        1usize
-    };
+    let max_cache_element: usize =
+        if data_injection_config.n_members / (n_fragments_first_row * 20) != 0usize {
+            data_injection_config.n_members / (n_fragments_first_row * 20)
+        } else {
+            1usize
+        };
     let out_path = cli.output_path.unwrap_or(PathBuf::from("./generated"));
     delete_previous_file(&out_path).await;
 
@@ -55,6 +56,9 @@ async fn main() {
         FragmentationTypeName::OneAryTree
     };
 
+    println!("data_dump_path {:?}", data_dump_path);
+    println!("data injection config {:?}", data_injection_config);
+
     parse_datadump(
         data_dump_path,
         &data_injection_config,
@@ -64,13 +68,14 @@ async fn main() {
         n_fragments_first_row,
         out_path,
         fragmentation_type,
-        dept
-    )
-    .unwrap();
+        dept,
+        cli.tree_id,
+    )?;
     let duration = start.elapsed();
 
     println!("Time elapsed is {}", format_duration(duration));
     println!("--- Fragmentation finished---");
+    Ok(())
 }
 
 async fn delete_previous_file(out_path: &PathBuf) {
